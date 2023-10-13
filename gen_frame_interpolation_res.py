@@ -109,13 +109,15 @@ def interpolate_frame(img_dir,output_name):
 
 
 output_name = "res"
+frame_interpolation_video = "frame_interpolation_output.avi"
+original_video = "original_output.avi"
+comp_video = "output.mp4"
+
 interpolate_frame(args.input_dir, output_name)
-create_video(os.path.join(root_dir, output_name), "output.avi")
+create_video(os.path.join(root_dir, output_name), frame_interpolation_video)
+create_video(args.input_dir, original_video)
 
 #create_video(args.input_dir)
 
-
-
-
-
+os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
 
