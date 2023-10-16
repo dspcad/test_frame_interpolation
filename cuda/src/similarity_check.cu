@@ -2,6 +2,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
+#include <cmath>
 
 
 using namespace std;
@@ -96,12 +97,14 @@ __host__ void similarity_check::execute(const char * image_1_path,
 
 
     unsigned long long N = img_height * img_width * channel;
-    uint8_t *d_img_1, *d_img_2, *d_diff;
+    printf("N: %ld\n");
+    uint8_t *d_img_1, *d_img_2;
+    int *d_diff;
 
     cudaMalloc((void**)&d_img_1, sizeof(uint8_t) * N);
     cudaMalloc((void**)&d_img_2, sizeof(uint8_t) * N);
-    cudaMalloc((void**)&d_diff,  sizeof(uint8_t) * N);
-    uint8_t * res_diff = (uint8_t *)malloc(sizeof(uint8_t)*N);
+    cudaMalloc((void**)&d_diff,  sizeof(int) * N);
+    int * res_diff = (int *)malloc(sizeof(int)*N);
 
     cudaMemcpy(d_img_1, img_1.data, sizeof(uint8_t) * N, cudaMemcpyHostToDevice);
     cudaMemcpy(d_img_2, img_2.data, sizeof(uint8_t) * N, cudaMemcpyHostToDevice);
@@ -127,27 +130,41 @@ __host__ void similarity_check::execute(const char * image_1_path,
     CHECK_CUDA_ASYNC_ERROR("Calculation");
 
 
-    cudaMemcpy(res_diff, d_diff, sizeof(uint8_t) * N, cudaMemcpyDeviceToHost);
+    cudaMemcpy(res_diff, d_diff, sizeof(int) * N, cudaMemcpyDeviceToHost);
+
 
 
     //printf("test res: %d\n", res_diff[0]);
 
-    //uint8_t * tmp_img_1 = img_1.data;
-    //uint8_t * tmp_img_2 = img_2.data;
-    //for(int i=0;i<img_1_h;++i){
-    //    for(int j=0;j<3*img_1_w;j+=3){
-    //        if(res_diff[i*3*img_1_w+j+0] !=0 || res_diff[i*3*img_1_w+j+1] !=0 || res_diff[i*3*img_1_w+j+2] !=0){
-    //            printf("Pixel[%d][%d]:\n",i,j);
-    //            printf("    R: %d\n",res_diff[i*3*img_1_w+j+0]);
-    //            printf("    G: %d\n",res_diff[i*3*img_1_w+j+1]);
-    //            printf("    B: %d\n",res_diff[i*3*img_1_w+j+2]);
-    //            printf("CPU R: %d\n",abs(tmp_img_1[i*3*img_1_w+j+0] - tmp_img_2[i*3*img_1_w+j+0]));
-    //            printf("CPU G: %d\n",abs(tmp_img_1[i*3*img_1_w+j+1] - tmp_img_2[i*3*img_1_w+j+1]));
-    //            printf("CPU B: %d\n",abs(tmp_img_1[i*3*img_1_w+j+2] - tmp_img_2[i*3*img_1_w+j+2]));
+    uint8_t * tmp_img_1 = img_1.data;
+    uint8_t * tmp_img_2 = img_2.data;
 
-    //        }
-    //    }
-    //}
+    unsigned long long cpu_tot=0;
+    unsigned long long gpu_tot=0;
+    for(int i=0;i<img_height;++i){
+        for(int j=0;j<3*img_width;j+=3){
+            //printf("Pixel[%d][%d]:\n",i,j/3);
+            //printf("    R: %d\n",res_diff[i*3*img_width+j+0]);
+            //printf("    G: %d\n",res_diff[i*3*img_width+j+1]);
+            //printf("    B: %d\n",res_diff[i*3*img_width+j+2]);
+            gpu_tot = gpu_tot + (res_diff[i*3*img_width+j+0]*res_diff[i*3*img_width+j+0]) + (res_diff[i*3*img_width+j+1]*res_diff[i*3*img_width+j+1]) + (res_diff[i*3*img_width+j+2]*res_diff[i*3*img_width+j+2]);
+ 
+            int r = abs((int)tmp_img_1[i*3*img_width+j+0] - (int)tmp_img_2[i*3*img_width+j+0]);
+            int g = abs((int)tmp_img_1[i*3*img_width+j+1] - (int)tmp_img_2[i*3*img_width+j+1]);
+            int b = abs((int)tmp_img_1[i*3*img_width+j+2] - (int)tmp_img_2[i*3*img_width+j+2]);
+
+            //printf("    R: %d\n",r);
+            //printf("    G: %d\n",g);
+            //printf("    B: %d\n",b);
+            cpu_tot = cpu_tot + r*r + g*g + b*b;
+        }
+    }
+
+    printf("gpu tot: %ld MSE: %f\n", gpu_tot, (double)gpu_tot/N);
+    printf("cpu tot: %ld MSE: %f\n", cpu_tot, (double)cpu_tot/N);
+
+    double mse = (double)gpu_tot/N;
+    printf("PSNR: %f\n", 20*log10(256/sqrt(mse)));
 
     //uint8_t * tmp_img_1 = img_1.data;
     //uint8_t * tmp_img_2 = img_2.data;
@@ -170,7 +187,7 @@ __host__ void similarity_check::execute(const char * image_1_path,
     return;
 }
 
-__global__ void compute_psnr_cuda(uint8_t *d_diff,
+__global__ void compute_psnr_cuda(int *d_diff,
                                   uint8_t *d_img_1,
                                   uint8_t *d_img_2,
                                   unsigned int height,
@@ -182,7 +199,7 @@ __global__ void compute_psnr_cuda(uint8_t *d_diff,
 
     if(x>=width || y>=height) return;
 
-    d_diff[x+y*width*3+0] = abs(d_img_1[x+y*width*3+0]-d_img_2[x+y*width*3+0]);
-    d_diff[x+y*width*3+1] = abs(d_img_1[x+y*width*3+1]-d_img_2[x+y*width*3+1]);
-    d_diff[x+y*width*3+2] = abs(d_img_1[x+y*width*3+2]-d_img_2[x+y*width*3+2]);
+    d_diff[3*x+y*width*3+0] = abs(d_img_1[3*x+y*width*3+0]-d_img_2[3*x+y*width*3+0]);
+    d_diff[3*x+y*width*3+1] = abs(d_img_1[3*x+y*width*3+1]-d_img_2[3*x+y*width*3+1]);
+    d_diff[3*x+y*width*3+2] = abs(d_img_1[3*x+y*width*3+2]-d_img_2[3*x+y*width*3+2]);
 }

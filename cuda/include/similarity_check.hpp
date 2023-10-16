@@ -23,7 +23,7 @@ namespace simcheck{
 
 
 
-__global__ void compute_psnr_cuda(uint8_t *d_diff,
+__global__ void compute_psnr_cuda(int *d_diff,
                                   uint8_t *d_img_1,
                                   uint8_t *d_img_2,
                                   unsigned int height,
