@@ -111,6 +111,11 @@ __host__ void similarity_check::execute(const char * image_1_path,
     cout << "Transfer image 1 and image 2 to GPU Memory" << endl;
 
 
+    unsigned long long *d_diff_sum;
+    cudaMalloc((void**)&d_diff_sum,  sizeof(unsigned long long));
+    unsigned long long *res_diff_sum = (unsigned long long *)malloc(sizeof(unsigned long long));
+    
+
     //const dim3 numBlocks(99, 45);
     //const dim3 threadsPerBlock(18, 18);a
 
@@ -120,7 +125,16 @@ __host__ void similarity_check::execute(const char * image_1_path,
     const dim3 threadsPerBlock(block_size, block_size);
 
 
-    compute_psnr_cuda<<<numBlocks,threadsPerBlock>>>(d_diff,
+    compute_rgb_diff_cuda<<<numBlocks,threadsPerBlock>>>(d_diff,
+                                                         d_img_1,
+                                                         d_img_2,
+                                                         img_1_h,
+                                                         img_1_w);
+
+    CHECK_LAST_CUDA_ERROR("Difference Calculation");
+    CHECK_CUDA_ASYNC_ERROR("Calculation");
+
+    compute_psnr_cuda<<<numBlocks,threadsPerBlock>>>(d_diff_sum,
                                                      d_img_1,
                                                      d_img_2,
                                                      img_1_h,
@@ -131,6 +145,7 @@ __host__ void similarity_check::execute(const char * image_1_path,
 
 
     cudaMemcpy(res_diff, d_diff, sizeof(int) * N, cudaMemcpyDeviceToHost);
+    cudaMemcpy(res_diff_sum, d_diff_sum, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
 
 
 
@@ -160,10 +175,11 @@ __host__ void similarity_check::execute(const char * image_1_path,
         }
     }
 
-    printf("gpu tot: %ld MSE: %f\n", gpu_tot, (double)gpu_tot/N);
+    printf("gpu tot: %ld MSE: %f\n", *res_diff_sum, (double)(*res_diff_sum)/N);
     printf("cpu tot: %ld MSE: %f\n", cpu_tot, (double)cpu_tot/N);
 
-    double mse = (double)gpu_tot/N;
+    //double mse = (double)gpu_tot/N;
+    double mse = (double)(*res_diff_sum)/N;
     printf("PSNR: %f\n", 20*log10(256/sqrt(mse)));
 
     //uint8_t * tmp_img_1 = img_1.data;
@@ -187,11 +203,11 @@ __host__ void similarity_check::execute(const char * image_1_path,
     return;
 }
 
-__global__ void compute_psnr_cuda(int *d_diff,
-                                  uint8_t *d_img_1,
-                                  uint8_t *d_img_2,
-                                  unsigned int height,
-                                  unsigned int width)
+__global__ void compute_rgb_diff_cuda(int *d_diff,
+                                      uint8_t *d_img_1,
+                                      uint8_t *d_img_2,
+                                      unsigned int height,
+                                      unsigned int width)
 {
 
     const int x = threadIdx.x+blockIdx.x*blockDim.x;
@@ -203,3 +219,26 @@ __global__ void compute_psnr_cuda(int *d_diff,
     d_diff[3*x+y*width*3+1] = abs(d_img_1[3*x+y*width*3+1]-d_img_2[3*x+y*width*3+1]);
     d_diff[3*x+y*width*3+2] = abs(d_img_1[3*x+y*width*3+2]-d_img_2[3*x+y*width*3+2]);
 }
+
+
+__global__ void compute_psnr_cuda(unsigned long long *d_diff_sum,
+                                  uint8_t *d_img_1,
+                                  uint8_t *d_img_2,
+                                  unsigned int height,
+                                  unsigned int width)
+{
+
+    const int x = threadIdx.x+blockIdx.x*blockDim.x;
+    const int y = threadIdx.y+blockIdx.y*blockDim.y;
+
+    if(x>=width || y>=height) return;
+
+    int r = abs(d_img_1[3*x+y*width*3+0]-d_img_2[3*x+y*width*3+0]);
+    int g = abs(d_img_1[3*x+y*width*3+1]-d_img_2[3*x+y*width*3+1]);
+    int b = abs(d_img_1[3*x+y*width*3+2]-d_img_2[3*x+y*width*3+2]);
+
+    atomicAdd(d_diff_sum,r*r);
+    atomicAdd(d_diff_sum,g*g);
+    atomicAdd(d_diff_sum,b*b);
+}
+
