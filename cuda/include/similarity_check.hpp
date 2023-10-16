@@ -3,7 +3,11 @@ namespace simcheck{
 
     class similarity_check{
         public:
-            similarity_check(): image_1{nullptr}, image_2{nullptr}, img_height{1}, img_width(1) {}
+            unsigned int img_height;
+            unsigned int img_width;
+            unsigned int channel;      
+
+            similarity_check(): image_1{nullptr}, image_2{nullptr}, img_height{1}, img_width{1}, channel{3}{}
             ~similarity_check()=default;
 
             
@@ -13,8 +17,6 @@ namespace simcheck{
         private:
             unsigned int *image_1;
             unsigned int *image_2;
-            unsigned int img_height;
-            unsigned int img_width;
 
     };
 }// end of namespace  simcheck

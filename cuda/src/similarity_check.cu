@@ -62,7 +62,6 @@ __host__ void similarity_check::execute(const char * image_1_path,
     printf("    type: %d\n", img_2.type());
 
 
-
     if(img_1.empty())
     {
         cout << "Could not read the image: " << image_1_path << endl;
@@ -82,6 +81,9 @@ __host__ void similarity_check::execute(const char * image_1_path,
     }
 
 
+    img_height = img_1_h;
+    img_width  = img_1_w;
+
 
     //imshow("Display window", img_2);
 
@@ -93,7 +95,7 @@ __host__ void similarity_check::execute(const char * image_1_path,
     //}
 
 
-    unsigned long long N = img_1_h * img_1_w * 3;
+    unsigned long long N = img_height * img_width * channel;
     uint8_t *d_img_1, *d_img_2, *d_diff;
 
     cudaMalloc((void**)&d_img_1, sizeof(uint8_t) * N);
@@ -106,8 +108,14 @@ __host__ void similarity_check::execute(const char * image_1_path,
     cout << "Transfer image 1 and image 2 to GPU Memory" << endl;
 
 
-    const dim3 numBlocks(100, 100);
-    const dim3 threadsPerBlock(10, 10);
+    //const dim3 numBlocks(99, 45);
+    //const dim3 threadsPerBlock(18, 18);a
+
+    constexpr int block_size {32};
+    printf("DIM: %ld %ld\n",(block_size+img_width-1)/block_size, (block_size+img_height-1)/block_size);
+    const dim3 numBlocks((block_size+img_width-1)/block_size, (block_size+img_height-1)/block_size);
+    const dim3 threadsPerBlock(block_size, block_size);
+
 
     compute_psnr_cuda<<<numBlocks,threadsPerBlock>>>(d_diff,
                                                      d_img_1,
@@ -115,10 +123,47 @@ __host__ void similarity_check::execute(const char * image_1_path,
                                                      img_1_h,
                                                      img_1_w);
 
+    CHECK_LAST_CUDA_ERROR("PSRN Calculation");
+    CHECK_CUDA_ASYNC_ERROR("Calculation");
+
+
     cudaMemcpy(res_diff, d_diff, sizeof(uint8_t) * N, cudaMemcpyDeviceToHost);
 
 
-    printf("test res: %d\n", res_diff[0]);
+    //printf("test res: %d\n", res_diff[0]);
+
+    //uint8_t * tmp_img_1 = img_1.data;
+    //uint8_t * tmp_img_2 = img_2.data;
+    //for(int i=0;i<img_1_h;++i){
+    //    for(int j=0;j<3*img_1_w;j+=3){
+    //        if(res_diff[i*3*img_1_w+j+0] !=0 || res_diff[i*3*img_1_w+j+1] !=0 || res_diff[i*3*img_1_w+j+2] !=0){
+    //            printf("Pixel[%d][%d]:\n",i,j);
+    //            printf("    R: %d\n",res_diff[i*3*img_1_w+j+0]);
+    //            printf("    G: %d\n",res_diff[i*3*img_1_w+j+1]);
+    //            printf("    B: %d\n",res_diff[i*3*img_1_w+j+2]);
+    //            printf("CPU R: %d\n",abs(tmp_img_1[i*3*img_1_w+j+0] - tmp_img_2[i*3*img_1_w+j+0]));
+    //            printf("CPU G: %d\n",abs(tmp_img_1[i*3*img_1_w+j+1] - tmp_img_2[i*3*img_1_w+j+1]));
+    //            printf("CPU B: %d\n",abs(tmp_img_1[i*3*img_1_w+j+2] - tmp_img_2[i*3*img_1_w+j+2]));
+
+    //        }
+    //    }
+    //}
+
+    //uint8_t * tmp_img_1 = img_1.data;
+    //uint8_t * tmp_img_2 = img_2.data;
+    //for(int i=0;i<img_1_h;++i){
+    //    for(int j=0;j<3*img_1_w;j+=3){
+    //        if(tmp_img_1[i*3*img_1_w+j+0] != tmp_img_2[i*3*img_1_w+j+0]){
+    //            printf("Pixel[%d][%d] is different\n", i,j/3);
+    //            printf("    img_1: %d\n",tmp_img_1[i*3*img_1_w+j+0]);
+    //            printf("    img_2: %d\n",tmp_img_2[i*3*img_1_w+j+0]);
+    //            printf("    diff: %d\n",res_diff[i*3*img_1_w+j+0]);
+
+    //        }
+    //    }
+    //}
+
+
     cudaFree(d_img_1);
     cudaFree(d_img_2);
     cudaFree(d_diff);
@@ -135,6 +180,9 @@ __global__ void compute_psnr_cuda(uint8_t *d_diff,
     const int x = threadIdx.x+blockIdx.x*blockDim.x;
     const int y = threadIdx.y+blockIdx.y*blockDim.y;
 
-    d_diff[x+y] = abs(d_img_1[x+y]-d_img_2[x+y]);
-    d_diff[0] = 199;
+    if(x>=width || y>=height) return;
+
+    d_diff[x+y*width*3+0] = abs(d_img_1[x+y*width*3+0]-d_img_2[x+y*width*3+0]);
+    d_diff[x+y*width*3+1] = abs(d_img_1[x+y*width*3+1]-d_img_2[x+y*width*3+1]);
+    d_diff[x+y*width*3+2] = abs(d_img_1[x+y*width*3+2]-d_img_2[x+y*width*3+2]);
 }
