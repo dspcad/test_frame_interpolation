@@ -11,8 +11,8 @@ namespace simcheck{
             ~similarity_check()=default;
 
             
-            __host__ void execute(const char * image_1_path,
-                                 const char * image_2_path);
+            __host__ double execute(const char * image_1_path,
+                                    const char * image_2_path);
 
         private:
             unsigned int *image_1;

@@ -1,5 +1,6 @@
 #include"similarity_check.hpp"
 
+using namespace std;
 
 int main(int argc, char *argv[]){
     if(argc != 3){
@@ -7,9 +8,13 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
+    const char * img_1 = argv[1];
+    const char * img_2 = argv[2];
+
+
     simcheck::similarity_check engine;
-    engine.execute("/home/hhwu/project/leying/test_frame_interpolation/python/test_imgs/0.png",
-                   "/home/hhwu/project/leying/test_frame_interpolation/python/test_imgs/2.png");
+    engine.execute(img_1,
+                   img_2);
 
     return 0;
 }

@@ -3,6 +3,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <cmath>
+#include <fstream>
 
 
 using namespace std;
@@ -38,9 +39,25 @@ __host__ void CHECK_CUDA_ASYNC_ERROR(const char * kernel_name)
 
 }
 
-__host__ void similarity_check::execute(const char * image_1_path,
-                                        const char * image_2_path)
+__host__ double similarity_check::execute(const char * image_1_path,
+                                          const char * image_2_path)
 {   
+
+    
+    ifstream f_1(image_1_path);
+    ifstream f_2(image_2_path);
+
+    if(!f_1.good()){
+        cout << image_1_path << " doesn't exist.\n";
+        return 0;
+    }
+
+    if(!f_2.good()){
+        cout << image_2_path << " doesn't exist.\n";
+        return 0;
+    }
+
+
     Mat img_1 = imread(image_1_path, IMREAD_COLOR);
     Mat img_2 = imread(image_2_path, IMREAD_COLOR);
 
@@ -66,19 +83,20 @@ __host__ void similarity_check::execute(const char * image_1_path,
     if(img_1.empty())
     {
         cout << "Could not read the image: " << image_1_path << endl;
-        return;
+        return 0;
     }
 
     if(img_2.empty())
     {
         cout << "Could not read the image: " << image_2_path << endl;
-        return;
+        return 0;
     }
 
 
     if(img_1_w != img_2_w || img_1_h != img_2_h)
     {
         cout << "Two images are not in the same size." << endl;
+        return 0;
     }
 
 
@@ -97,7 +115,7 @@ __host__ void similarity_check::execute(const char * image_1_path,
 
 
     unsigned long long N = img_height * img_width * channel;
-    printf("N: %ld\n");
+    printf("N: %ld\n", N);
     uint8_t *d_img_1, *d_img_2;
     int *d_diff;
 
@@ -154,24 +172,29 @@ __host__ void similarity_check::execute(const char * image_1_path,
     uint8_t * tmp_img_1 = img_1.data;
     uint8_t * tmp_img_2 = img_2.data;
 
+    printf("debug: %d\n", tmp_img_1[10*3*img_width+242*3+1]);
     unsigned long long cpu_tot=0;
     unsigned long long gpu_tot=0;
+
     for(int i=0;i<img_height;++i){
-        for(int j=0;j<3*img_width;j+=3){
+        for(int j=0;j<img_width;++j){
             //printf("Pixel[%d][%d]:\n",i,j/3);
             //printf("    R: %d\n",res_diff[i*3*img_width+j+0]);
             //printf("    G: %d\n",res_diff[i*3*img_width+j+1]);
             //printf("    B: %d\n",res_diff[i*3*img_width+j+2]);
-            gpu_tot = gpu_tot + (res_diff[i*3*img_width+j+0]*res_diff[i*3*img_width+j+0]) + (res_diff[i*3*img_width+j+1]*res_diff[i*3*img_width+j+1]) + (res_diff[i*3*img_width+j+2]*res_diff[i*3*img_width+j+2]);
+            gpu_tot = gpu_tot + (res_diff[i*3*img_width+j*3+0]*res_diff[i*3*img_width+j*3+0]) + (res_diff[i*3*img_width+j*3+1]*res_diff[i*3*img_width+j*3+1]) + (res_diff[i*3*img_width+j*3+2]*res_diff[i*3*img_width+j*3+2]);
  
-            int r = abs((int)tmp_img_1[i*3*img_width+j+0] - (int)tmp_img_2[i*3*img_width+j+0]);
-            int g = abs((int)tmp_img_1[i*3*img_width+j+1] - (int)tmp_img_2[i*3*img_width+j+1]);
-            int b = abs((int)tmp_img_1[i*3*img_width+j+2] - (int)tmp_img_2[i*3*img_width+j+2]);
+            int r = (int)tmp_img_1[i*3*img_width+j*3+0] - (int)tmp_img_2[i*3*img_width+j*3+0];
+            int g = (int)tmp_img_1[i*3*img_width+j*3+1] - (int)tmp_img_2[i*3*img_width+j*3+1];
+            int b = (int)tmp_img_1[i*3*img_width+j*3+2] - (int)tmp_img_2[i*3*img_width+j*3+2];
 
-            //printf("    R: %d\n",r);
-            //printf("    G: %d\n",g);
-            //printf("    B: %d\n",b);
+            printf("[%d,%d]:   [%d %d %d] - [%d %d %d]\n", i,j,tmp_img_1[i*3*img_width+j*3+0],tmp_img_1[i*3*img_width+j*3+1],tmp_img_1[i*3*img_width+j*3+2], tmp_img_2[i*3*img_width+j*3+0],tmp_img_2[i*3*img_width+j*3+1],tmp_img_2[i*3*img_width+j*3+2]);
+            printf("    R: %d\n",r);
+            printf("    G: %d\n",g);
+            printf("    B: %d\n",b);
             cpu_tot = cpu_tot + r*r + g*g + b*b;
+
+            //printf("[%d,%d] r:%d g:%d b:%d\n",i,j, r,g,b);
         }
     }
 
@@ -180,7 +203,7 @@ __host__ void similarity_check::execute(const char * image_1_path,
 
     //double mse = (double)gpu_tot/N;
     double mse = (double)(*res_diff_sum)/N;
-    printf("PSNR: %f\n", 20*log10(256/sqrt(mse)));
+    printf("PSNR: %f\n", 20*log10(255/sqrt(mse)));
 
     //uint8_t * tmp_img_1 = img_1.data;
     //uint8_t * tmp_img_2 = img_2.data;
@@ -200,7 +223,12 @@ __host__ void similarity_check::execute(const char * image_1_path,
     cudaFree(d_img_1);
     cudaFree(d_img_2);
     cudaFree(d_diff);
-    return;
+    cudaFree(d_diff_sum);
+
+    free(res_diff);
+    free(res_diff_sum);
+
+    return 20*log10(256/sqrt(mse));
 }
 
 __global__ void compute_rgb_diff_cuda(int *d_diff,
@@ -233,12 +261,17 @@ __global__ void compute_psnr_cuda(unsigned long long *d_diff_sum,
 
     if(x>=width || y>=height) return;
 
-    int r = abs(d_img_1[3*x+y*width*3+0]-d_img_2[3*x+y*width*3+0]);
-    int g = abs(d_img_1[3*x+y*width*3+1]-d_img_2[3*x+y*width*3+1]);
-    int b = abs(d_img_1[3*x+y*width*3+2]-d_img_2[3*x+y*width*3+2]);
+    int r = (int)d_img_1[3*x+y*width*3+0]-(int)d_img_2[3*x+y*width*3+0];
+    int g = (int)d_img_1[3*x+y*width*3+1]-(int)d_img_2[3*x+y*width*3+1];
+    int b = (int)d_img_1[3*x+y*width*3+2]-(int)d_img_2[3*x+y*width*3+2];
 
     atomicAdd(d_diff_sum,r*r);
     atomicAdd(d_diff_sum,g*g);
     atomicAdd(d_diff_sum,b*b);
 }
 
+
+extern "C" {
+    similarity_check* simcheck_new(){ return new similarity_check(); }
+    void compute_psnr(similarity_check* simcheck, const char * image_1_path, const char * image_2_path){ simcheck->execute(image_1_path,image_2_path); }
+}
