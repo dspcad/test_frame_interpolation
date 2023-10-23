@@ -40,10 +40,19 @@ print(f"root dir: {root_dir}")
 # STRIDE = 2
 # =============
 # GenshinImpact
-SCALE = 0.5
-LOD = 5.0
-KERNEL = 7
-STRIDE = 1
+#SCALE = 0.5
+#LOD = 5.0
+#THRESHOLD = 0.0
+#KERNEL = 7
+#STRIDE = 1
+#NGRID  =
+
+SCALE  = 0.15063696560609532
+LOD    = 0.9925937951308552
+THRESHOLD = 0.0
+KERNEL = 8
+STRIDE = 2
+NGRID  = 4
 
 
 
@@ -87,19 +96,23 @@ def interpolate_frame(img_dir,output_name):
         if i%2==1 and i<len(natsort_file_names)-1:
             input1_name = os.path.join(img_dir, natsort_file_names[i-1])
             input2_name = os.path.join(img_dir, natsort_file_names[i+1])
-            print(f"{args.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {SCALE} --lod {LOD} --kernel {KERNEL} --stride {STRIDE} --out {natsort_file_names[i]} ")
-            os.system(
-                "{} --input1 {} --input2 {} --scaleFactor {} --lod {} --kernel {} --stride {} --out {} > /dev/null 2>&1".format(
+            print(f"{args.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {SCALE} --lod {LOD} --threshold {THRESHOLD} --kernel {KERNEL} --stride {STRIDE} --ngrid {NGRID} --out {natsort_file_names[i]} ")
+            os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}".format(
                     args.bin_file,
                     input1_name,
                     input2_name,
                     SCALE,
                     LOD,
+                    THRESHOLD,
                     KERNEL,
                     STRIDE,
+                    NGRID,
                     natsort_file_names[i],
                 )
             )
+
+
+
             shutil.copy(natsort_file_names[i], output_path)
             os.remove(natsort_file_names[i])
         else:

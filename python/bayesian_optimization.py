@@ -146,7 +146,7 @@ SPACE=[
 res = gp_minimize(f,                  # the function to minimize
                   SPACE,              # the bounds on each dimension of x
                   acq_func="PI",      # the acquisition function
-                  n_calls=50,         # the number of evaluations of f
+                  n_calls=10,         # the number of evaluations of f
                   n_random_starts=5,  # the number of random initialization points
                   noise=0.1**2,       # the noise level (optional)
                   random_state=1234)  # the random seed
@@ -161,6 +161,21 @@ print(f"   STRIDE: {res.x[3]}")
 print(f"    NGRID: {res.x[4]}")
 print(f"{args.obj_fun}: {-res.fun}")
 #print(f"SSIM: {-res.fun}")
+
+
+tot=[]
+for i in range(0,len(natsort_file_names)):
+    if i%2==1 and i<len(natsort_file_names)-1:
+        ground_truth_path = os.path.join(args.dataset_dir, natsort_file_names[i])
+        img_1_path        = os.path.join(args.dataset_dir, natsort_file_names[i-1])
+        img_2_path        = os.path.join(args.dataset_dir, natsort_file_names[i+1])
+        val               = -psnr_or_ssim(res.x, img_1_path, img_2_path, ground_truth_path)
+
+        tot.append(val)
+
+print(len(tot))
+print(np.mean(tot))
+
 
 
 
