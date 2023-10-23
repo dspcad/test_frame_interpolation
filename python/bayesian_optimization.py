@@ -3,7 +3,7 @@ np.random.seed(237)
 import matplotlib.pyplot as plt
 from skopt.plots import plot_gaussian_process
 from skopt import gp_minimize
-import skopt
+import skopt, sys
 import cv2, os, argparse
 from math import log10, sqrt 
 from skimage.metrics import peak_signal_noise_ratio as sk_psnr
@@ -18,32 +18,45 @@ parser = argparse.ArgumentParser(description='bayesian optimization for frame in
 parser.add_argument('--dataset_dir', type=str,
                     help='A required input of images')
 
+parser.add_argument('--bin_file', type=str, 
+                    help='A required bin file for frame interpolation')
+
+
+parser.add_argument('--obj_fun', type=str, default="PSNR",
+                    help='A opitonal objective function (either PSNR or SSIM), default is PSNR')
+
+funs = ["PSNR","SSIM"]
 
 
 args = parser.parse_args()
-print(args.dataset_dir)
+
+
 if(not os.path.isdir(args.dataset_dir)):
     print(f"{args.dataset_dir} cannot be found ... make sure input directory is correct")
     sys.exit(1)
 
-
-params={}
-
-params['SCALE']= 0.5
-params['LOD']= 2.5
-params['KERNEL']= 7
-params['STRIDE']= 1
-
+if args.obj_fun not in funs:
+    print(f"objective function: {args.obj_fun}")
+    print(f"Supported objective functions: {funs}")
+    sys.exit(1)
 
 
 
 x = [0.5,5.0,7,1]
-bin_file = "/home/hhwu/project/leying/innocompute/build/demos/frame_interp/innocompute_examples_frame_interp"
+#bin_file = "/home/hhwu/project/leying/innocompute/build/demos/frame_interp/innocompute_examples_frame_interp"
+bin_file = args.bin_file
 interpolated_frame = "res_frame_interp.png"
 
 # Root directory of this script
 root_dir = os.path.dirname(os.path.realpath(__file__))
-print(f"root dir: {root_dir}")
+
+
+print("====================================")
+print(f"= root dir: {root_dir}")
+print(f"= bin file: {bin_file}")
+print(f"= objective function: {args.obj_fun}")
+print(f"= output file: {interpolated_frame}")
+print("====================================")
 
 files = os.listdir(args.dataset_dir)
 files = [f for f in files if f.endswith(".png")]
@@ -53,43 +66,9 @@ print(natsort_file_names[:-1])
 
 
 
-def ssim(x, img_1_path, img_2_path, ground_truth_path):
-    #PARAMS
-    SCALE  = 0.5
-    LOD    = x[0]
-    KERNEL = x[1]
-    STRIDE = x[2]
 
 
-    print(f"SCALE: {SCALE}   LOD: {LOD}  KERNEL: {KERNEL}  STRIDE: {STRIDE}")
-    
-
-
-
-    os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --kernel {} --stride {} --out {}".format(
-                bin_file,
-                img_1_path,
-                img_2_path,
-                SCALE,
-                LOD,
-                KERNEL,
-                STRIDE,
-                interpolated_frame,
-                )
-    )
-
-    interpolated_img = cv2.imread(interpolated_frame)
-    ground_truth_img = cv2.imread(ground_truth_path)
-
-
-    #print(interpolated_img.shape)
-    #print(ground_truth_img.shape)
-
-    #print(type(interpolated_img))
-
-    return sk_ssim(ground_truth_img, interpolated_img, data_range=ground_truth_img.max() - ground_truth_img.min(), channel_axis=2)
-
-def psnr(x, img_1_path, img_2_path, ground_truth_path):
+def psnr_or_ssim(x, img_1_path, img_2_path, ground_truth_path):
     #PARAMS
     SCALE  = x[0]
     LOD    = x[1]
@@ -99,7 +78,6 @@ def psnr(x, img_1_path, img_2_path, ground_truth_path):
     NGRID  = x[4]
 
 
-    tot=0
     print(f"SCALE: {SCALE}   LOD: {LOD}  THRESHOLD: {THRESHOLD}  KERNEL: {KERNEL}  STRIDE: {STRIDE}   NGRID: {NGRID}")
 
 
@@ -128,12 +106,13 @@ def psnr(x, img_1_path, img_2_path, ground_truth_path):
     #print(type(interpolated_img))
 
 
-    return sk_psnr(ground_truth_img, interpolated_img)
+    if args.obj_fun == "PSNR":
+        return sk_psnr(ground_truth_img, interpolated_img)
+    elif args.obj_fun == "SSIM":
+        return sk_ssim(ground_truth_img, interpolated_img, data_range=ground_truth_img.max() - ground_truth_img.min(), channel_axis=2)
 
 
 
-#def f(x, noise_level=noise_level):
-#    return np.sin(5 * x[0]) * (1 - np.tanh(x[0] ** 2)) + np.random.randn() * noise_level
 
 def f(x):
 
@@ -144,12 +123,8 @@ def f(x):
         ground_truth_path = os.path.join(args.dataset_dir, f)
         img_1_path        = os.path.join(args.dataset_dir, natsort_file_names[natsort_file_names.index(f)-1])
         img_2_path        = os.path.join(args.dataset_dir, natsort_file_names[natsort_file_names.index(f)+1])
-        val               = -psnr(x, img_1_path, img_2_path, ground_truth_path)
-        #val               = -ssim(x, img_1_path, img_2_path, ground_truth_path)
+        val               = -psnr_or_ssim(x, img_1_path, img_2_path, ground_truth_path)
 
-        #print(img_1_path)
-        #print(img_2_path)
-        #print(ground_truth_path)
         tot.append(val)
 
     print(f"Batch average loss: {np.mean(tot)}")
@@ -157,13 +132,16 @@ def f(x):
 
 
 
-
+#############################
+# Parameter Searching Space #
+#############################
 SPACE=[
     skopt.space.Real(0.0, 1.0, name='SCALE', prior='uniform'),
     skopt.space.Real(0.0, 5.0, name='LOD'),
     skopt.space.Integer(3, 9, name='KERNEL'),
     skopt.space.Integer(1, 9, name='STRIDE'),
     skopt.space.space.Categorical([4,8,16,32], name='NGRID')]
+
 
 res = gp_minimize(f,                  # the function to minimize
                   SPACE,              # the bounds on each dimension of x
@@ -173,13 +151,18 @@ res = gp_minimize(f,                  # the function to minimize
                   noise=0.1**2,       # the noise level (optional)
                   random_state=1234)  # the random seed
 
+
 print(res)
 print("Best params:")
-print(f"      LOD: {res.x[0]}")
-print(f"   KERNEL: {res.x[1]}")
-print(f"   STRIDE: {res.x[2]}")
-print(f"PSNR: {-res.fun}")
+print(f"    SCALE: {res.x[0]}")
+print(f"      LOD: {res.x[1]}")
+print(f"   KERNEL: {res.x[2]}")
+print(f"   STRIDE: {res.x[3]}")
+print(f"    NGRID: {res.x[4]}")
+print(f"{args.obj_fun}: {-res.fun}")
 #print(f"SSIM: {-res.fun}")
 
-print(psnr(res.x, "/home/hhwu/project/leying/test_frame_interpolation/python/wzry/000002.png", "/home/hhwu/project/leying/test_frame_interpolation/python/wzry/000004.png", "/home/hhwu/project/leying/test_frame_interpolation/python/wzry/000003.png"))
+
+
+#print(psnr_or_ssim(res.x, "/home/hhwu/project/leying/test_frame_interpolation/python/wzry/000002.png", "/home/hhwu/project/leying/test_frame_interpolation/python/wzry/000004.png", "/home/hhwu/project/leying/test_frame_interpolation/python/wzry/000003.png"))
 #print(ssim(res.x, "/home/hhwu/project/leying/test_frame_interpolation/python/test_imgs/0.png", "/home/hhwu/project/leying/test_frame_interpolation/python/test_imgs/2.png", "/home/hhwu/project/leying/test_frame_interpolation/python/test_imgs/1.png"))
