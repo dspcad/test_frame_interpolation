@@ -1,0 +1,6 @@
+multipledispatch
+numpy
+opencv-python
+scikit-optimize
+scikit-image
+natsort
