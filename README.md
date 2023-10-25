@@ -1,10 +1,14 @@
 Some utility codes for testing frame interpolation
 
 
-# Bayesian Optimization
-* ```python3 bayesian_optimization.py -h``` to know the detail
+# Install the required packages
+* ```pip3 install -r requirements.txt```
 
-* For example, ```python3 bayesian_optimization.py --dataset_dir test_imgs/ --bin_file ../../innocompute/build/demos/frame_interp/innocompute_examples_frame_interp```
+# Demo codes for how to use innocompute_examples_frame_interp.exe on windows
+* Make sure you have binary built on windows
+* ```python demo_*.py -h``` to know the usage
+* To read two images and produce the interpolated one, please use below for example:
+``` python3 demo_two_frames_interpolation_res.py --input_1 ..\..\000000.png --input_2 ..\..\000001.png --bin_file ..\..\innocompute_examples_frame_interp.exe --out res.png```
 
 
 # CUDA version of PSNR
