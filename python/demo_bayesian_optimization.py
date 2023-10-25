@@ -52,5 +52,6 @@ demo.create_video(os.path.join(demo.root_dir, output_dir), frame_interpolation_v
 demo.create_video(args.dataset_dir, original_video)
 
 os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
+demo.info()
 
 

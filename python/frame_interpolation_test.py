@@ -3,6 +3,7 @@ import os, sys, cv2, shutil
 import skopt
 from skopt import gp_minimize
 from natsort import natsorted
+from tqdm import tqdm
 
 from skimage.metrics import peak_signal_noise_ratio as sk_psnr
 from skimage.metrics import structural_similarity as sk_ssim
@@ -89,7 +90,7 @@ class FrameInterpolationTest:
         files = os.listdir(img_dir)
         files = [f for f in files if f.endswith(".png")]
         natsort_file_names = natsorted(files)
-        print(natsort_file_names)
+        #print(natsort_file_names)
 
         frame = cv2.imread(os.path.join(img_dir, files[0]))
         height, width, layers = frame.shape
@@ -98,8 +99,8 @@ class FrameInterpolationTest:
         print(f"FPS of video is {self.fps}")
         video = cv2.VideoWriter(video_name, 0, self.fps, (width,height))
 
-        for f in natsort_file_names:
-            print(f"img: {f}")
+        for f in tqdm(natsort_file_names, position=0, leave=True):
+            #print(f"img: {f}")
             video.write(cv2.imread(os.path.join(img_dir, f)))
 
         cv2.destroyAllWindows()
@@ -141,14 +142,14 @@ class FrameInterpolationTest:
             shutil.rmtree(output_path)
     
         os.mkdir(output_path)
-        print(natsort_file_names)
+        #print(f"output: {output_path}")
         for i in range(0,len(natsort_file_names)):
     
             if i%2==1 and i<len(natsort_file_names)-1:
                 input1_name = os.path.join(img_dir, natsort_file_names[i-1])
                 input2_name = os.path.join(img_dir, natsort_file_names[i+1])
-                print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {natsort_file_names[i]} ")
-                os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}".format(
+                #print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {natsort_file_names[i]} ")
+                os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} 1>/dev/null".format(
                         self.bin_file,
                         input1_name,
                         input2_name,
@@ -163,13 +164,13 @@ class FrameInterpolationTest:
                 )
     
     
-    
+                #print(f"{os.path.join(self.root_dir,natsort_file_names[i])} {output_path}")
+                #shutil.copy(os.path.join(self.root_dir,natsort_file_names[i]), output_path)
                 shutil.copy(natsort_file_names[i], output_path)
                 os.remove(natsort_file_names[i])
             else:
                 frame = cv2.imread(os.path.join(img_dir, natsort_file_names[i]))
                 cv2.imwrite(os.path.join(output_path, natsort_file_names[i]), frame)
-            print(f"{i}: {natsort_file_names[i]}")
 
 
     def psnr_or_ssim(self, x, img_1_path, img_2_path, ground_truth_path):
@@ -183,10 +184,10 @@ class FrameInterpolationTest:
         NGRID  = x[4]
     
     
-        print(f"SCALE: {SCALE}   LOD: {LOD}  THRESHOLD: {THRESHOLD}  KERNEL: {KERNEL}  STRIDE: {STRIDE}   NGRID: {NGRID}")
+        #print(f"SCALE: {SCALE}   LOD: {LOD}  THRESHOLD: {THRESHOLD}  KERNEL: {KERNEL}  STRIDE: {STRIDE}   NGRID: {NGRID}")
     
     
-        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}".format(
+        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} 1>/dev/null".format(
                         self.bin_file,
                         img_1_path,
                         img_2_path,
@@ -255,7 +256,7 @@ class FrameInterpolationTest:
         print(f"   KERNEL: {res.x[2]}")
         print(f"   STRIDE: {res.x[3]}")
         print(f"    NGRID: {res.x[4]}")
-        print(f"{self.obj_fun}: {-res.fun}")
+        print(f"    {self.obj_fun}: {-res.fun}")
 
 
         self.best_params['SCALE']  = res.x[0]
@@ -272,7 +273,9 @@ class FrameInterpolationTest:
         assert self.dataset_file_names
         tot=[]
         params = [self.SCALE, self.LOD, self.KERNEL, self.STRIDE, self.NGRID]
-        for i in range(0,len(self.dataset_file_names)):
+        print(f"Start evaluating {self.dataset_dir} with the following parameters")
+        self.info()
+        for i in tqdm(range(0,len(self.dataset_file_names)), position=0, leave=True):
             if i%2==1 and i<len(self.dataset_file_names)-1:
                 ground_truth_path = os.path.join(self.dataset_dir, self.dataset_file_names[i])
                 img_1_path        = os.path.join(self.dataset_dir, self.dataset_file_names[i-1])
@@ -281,8 +284,8 @@ class FrameInterpolationTest:
 
                 tot.append(val)
 
-        print(len(tot))
-        print(np.mean(tot))
+        print(f"Total images is {len(tot)}")
+        print(f"The average PSRN: {np.mean(tot)}")
 
     def applyBestPredictedParams(self):
         self.SCALE    = self.best_params['SCALE']  
