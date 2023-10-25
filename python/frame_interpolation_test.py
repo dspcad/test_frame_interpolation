@@ -1,3 +1,4 @@
+from multipledispatch import dispatch
 import os, sys, cv2, shutil
 import skopt
 from skopt import gp_minimize
@@ -104,8 +105,31 @@ class FrameInterpolationTest:
         cv2.destroyAllWindows()
         video.release()
 
+    
 
-    def interpolate_frame(self, img_dir,output_dir):
+    @dispatch(str, str, str)
+    def interpolate_frame(self, img_1, img_2, interpolated_res) -> None:
+        "Interpolate the img_1 and img_2 based on the parameters"
+        input1_name = os.path.join(self.root_dir, img_1)
+        input2_name = os.path.join(self.root_dir, img_2)
+        print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {interpolated_res} ")
+        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}".format(
+                self.bin_file,
+                input1_name,
+                input2_name,
+                self.SCALE,
+                self.LOD,
+                self.THRESHOLD,
+                self.KERNEL,
+                self.STRIDE,
+                self.NGRID,
+                interpolated_res,
+            )
+        )
+
+
+    @dispatch(str, str)
+    def interpolate_frame(self, img_dir, output_dir) -> None:
         "Interpolate the frames of even number and clone the frames of odd number"
         files = os.listdir(img_dir)
         files = [f for f in files if f.endswith(".png")]
