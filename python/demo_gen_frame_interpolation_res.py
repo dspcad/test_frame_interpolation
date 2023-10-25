@@ -9,12 +9,12 @@ parser = argparse.ArgumentParser(description='frame interpolation arguments')
 parser.add_argument('--input_dir', type=str,
                     help='A required input of images')
 
+parser.add_argument('--bin_file', type=str,
+                    help='A required bin file for frame interpolation')
+
 parser.add_argument('--fps', type=int, default=15,
                     help='An optional integer fps argument and default is 15')
 
-
-parser.add_argument('--bin_file', type=str,
-                    help='A required bin file for frame interpolation')
 
 
 args = parser.parse_args()
@@ -37,8 +37,6 @@ comp_video = "output.mp4"
 test1.interpolate_frame(args.input_dir, output_dir)
 test1.create_video(os.path.join(test1.root_dir, output_dir), frame_interpolation_video)
 test1.create_video(args.input_dir, original_video)
-
-#create_video(args.input_dir)
 
 os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
 
