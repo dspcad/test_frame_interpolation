@@ -15,6 +15,8 @@ np.random.seed(237)
 SUPRESS_MSG = ''
 if platform.system() == 'Linux':
     SUPRESS_MSG = '1>/dev/null'
+elif platform.system() == 'Windows':
+    SUPRESS_MSG = ' > nul'
 
 class FrameInterpolationTest:
     "A framework to test frame interpolation and fine tune the parameters of the algorithm"
