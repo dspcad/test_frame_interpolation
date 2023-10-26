@@ -33,7 +33,16 @@ if(not os.path.isfile(args.bin_file)):
     print(f"{args.bin_file} cannot be found ... make sure the path to bin file is correct")
     sys.exit(1)
 
-
-
 demo = FrameInterpolationTest(args.bin_file)
+
+demo.SCALE   = 0.1157091058273179
+demo.LOD     = 2.4796377985468103
+demo.KERNEL  =9
+demo.STRIDE  = 2
+demo.NGRID   =16
+
+demo.info();
+
+print(f"Start interpolating frame...")
 demo.interpolate_frame(args.input_1, args.input_2, args.out)
+

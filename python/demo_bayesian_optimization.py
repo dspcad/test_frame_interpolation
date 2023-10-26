@@ -16,6 +16,8 @@ parser.add_argument('--bin_file', type=str,
 parser.add_argument('--obj_fun', type=str, default="PSNR",
                     help='A opitonal objective function (either PSNR or SSIM), default is PSNR')
 
+
+
 funs = ["PSNR","SSIM"]
 
 
@@ -38,14 +40,15 @@ demo.setDataset(args.dataset_dir)
 demo.run_bayesian_opt()
 
 demo.applyBestPredictedParams()
-demo.eval()
+#demo.eval()
 
 print(demo.best_params)
 
 output_dir = "res"
-frame_interpolation_video = "frame_interpolation_output.avi"
-original_video = "original_output.avi"
+frame_interpolation_video = "output_frame_interpolation.avi"
+original_video = "output_original.avi"
 comp_video = "output.mp4"
+
 
 demo.interpolate_frame(args.dataset_dir, output_dir)
 demo.create_video(os.path.join(demo.root_dir, output_dir), frame_interpolation_video)

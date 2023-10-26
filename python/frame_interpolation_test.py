@@ -1,5 +1,6 @@
 from multipledispatch import dispatch
 import os, sys, cv2, shutil
+import platform
 import skopt
 from skopt import gp_minimize
 from natsort import natsorted
@@ -10,6 +11,10 @@ from skimage.metrics import structural_similarity as sk_ssim
 import random
 import numpy as np
 np.random.seed(237)
+
+SUPRESS_MSG = ''
+if platform.system() == 'Linux':
+    SUPRESS_MSG = '1>/dev/null'
 
 class FrameInterpolationTest:
     "A framework to test frame interpolation and fine tune the parameters of the algorithm"
@@ -30,10 +35,10 @@ class FrameInterpolationTest:
 
         self.best_params = {}
 
-        self.fps = 15
+        self.fps = 30
 
         #Bayesian Optimization parameters
-        self.n_calls = 20
+        self.n_calls = 50
         self.batch_size = 5
 
         self.SPACE=[
@@ -96,7 +101,7 @@ class FrameInterpolationTest:
         height, width, layers = frame.shape
 
         #fps = 15
-        print(f"FPS of video is {self.fps}")
+        print(f"FPS of {video_name} is {self.fps}")
         video = cv2.VideoWriter(video_name, 0, self.fps, (width,height))
 
         for f in tqdm(natsort_file_names, position=0, leave=True):
@@ -114,7 +119,7 @@ class FrameInterpolationTest:
         input1_name = os.path.join(self.root_dir, img_1)
         input2_name = os.path.join(self.root_dir, img_2)
         print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {interpolated_res} ")
-        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}".format(
+        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}  {}".format(
                 self.bin_file,
                 input1_name,
                 input2_name,
@@ -125,6 +130,7 @@ class FrameInterpolationTest:
                 self.STRIDE,
                 self.NGRID,
                 interpolated_res,
+                SUPRESS_MSG
             )
         )
 
@@ -143,13 +149,13 @@ class FrameInterpolationTest:
     
         os.mkdir(output_path)
         #print(f"output: {output_path}")
-        for i in range(0,len(natsort_file_names)):
+        for i in tqdm(range(0,len(natsort_file_names)), position=0, leave=True):
     
             if i%2==1 and i<len(natsort_file_names)-1:
                 input1_name = os.path.join(img_dir, natsort_file_names[i-1])
                 input2_name = os.path.join(img_dir, natsort_file_names[i+1])
                 #print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {natsort_file_names[i]} ")
-                os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} 1>/dev/null".format(
+                os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}  {}".format(
                         self.bin_file,
                         input1_name,
                         input2_name,
@@ -160,6 +166,7 @@ class FrameInterpolationTest:
                         self.STRIDE,
                         self.NGRID,
                         natsort_file_names[i],
+                        SUPRESS_MSG
                     )
                 )
     
@@ -187,7 +194,7 @@ class FrameInterpolationTest:
         #print(f"SCALE: {SCALE}   LOD: {LOD}  THRESHOLD: {THRESHOLD}  KERNEL: {KERNEL}  STRIDE: {STRIDE}   NGRID: {NGRID}")
     
     
-        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} 1>/dev/null".format(
+        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}   {}".format(
                         self.bin_file,
                         img_1_path,
                         img_2_path,
@@ -198,6 +205,7 @@ class FrameInterpolationTest:
                         STRIDE,
                         NGRID,
                         self.tmp_interpolated_frame,
+                        SUPRESS_MSG
                     )
                 )
     
