@@ -11,6 +11,7 @@ from skimage.metrics import structural_similarity as sk_ssim
 import random
 import numpy as np
 np.random.seed(237)
+import matplotlib.pyplot as plt
 
 SUPRESS_MSG = ''
 if platform.system() == 'Linux':
@@ -33,22 +34,23 @@ class FrameInterpolationTest:
         self.THRESHOLD = 0.0
         self.KERNEL    = 7
         self.STRIDE    = 1
-        self.NGRID     = 32
+        self.NGRID     = 16
 
         self.best_params = {}
+        self.tot_hist=None
 
         self.fps = 30
 
         #Bayesian Optimization parameters
-        self.n_calls = 50
+        self.n_calls = 10
         self.batch_size = 5
 
         self.SPACE=[
             skopt.space.Real(0.0, 1.0, name='SCALE', prior='uniform'),
-            skopt.space.Real(0.0, 5.0, name='LOD'),
-            skopt.space.Integer(3, 9, name='KERNEL'),
-            skopt.space.Integer(1, 9, name='STRIDE'),
-            skopt.space.space.Categorical([4,8,16,32], name='NGRID')]
+            skopt.space.space.Categorical([0,1,2,3,4,5], name='LOD'),
+            skopt.space.space.Categorical([3,5,7,9], name='KERNEL'),
+            skopt.space.space.Categorical([1,3,5,7,9], name='STRIDE'),
+            skopt.space.space.Categorical([4,8,16], name='NGRID')]
 
         self.obj_fun = "PSNR"
         self.dataset_dir = None
@@ -56,6 +58,8 @@ class FrameInterpolationTest:
         self.tmp_interpolated_frame = "tmp_frame_interp_res.png"
 
         self.info()
+        self.report = "test_res"
+        self.eval_psnr = 0
 
 
     def info(self):
@@ -86,6 +90,13 @@ class FrameInterpolationTest:
 
     def setDataset(self, dataset_dir):
         self.dataset_dir = dataset_dir
+        self.report = self.dataset_dir.replace("/","_")+"report"
+        if os.path.isdir(self.report):
+            shutil.rmtree(self.report)
+
+        os.mkdir(self.report)
+
+        
         files = os.listdir(self.dataset_dir)
         files = [f for f in files if f.endswith(".png")]
         self.dataset_file_names = natsorted(files)
@@ -241,8 +252,9 @@ class FrameInterpolationTest:
     
             tot.append(val)
     
-        print(f"Batch average loss: {np.mean(tot)}")
-        return np.mean(tot)
+        batch_psnr = np.mean(tot)
+        print(f"Batch average loss: {-batch_psnr}")
+        return batch_psnr
     
 
 
@@ -282,6 +294,7 @@ class FrameInterpolationTest:
         assert self.dataset_dir
         assert self.dataset_file_names
         tot=[]
+        self.tot_hist=np.zeros(256);
         params = [self.SCALE, self.LOD, self.KERNEL, self.STRIDE, self.NGRID]
         print(f"Start evaluating {self.dataset_dir} with the following parameters")
         self.info()
@@ -292,10 +305,35 @@ class FrameInterpolationTest:
                 img_2_path        = os.path.join(self.dataset_dir, self.dataset_file_names[i+1])
                 val               = -self.psnr_or_ssim(params, img_1_path, img_2_path, ground_truth_path)
 
+        
+                interpolated_img = cv2.imread(self.tmp_interpolated_frame)
+                ground_truth_img = cv2.imread(ground_truth_path)
+
+                abs_diff = abs(ground_truth_img - interpolated_img)
+                count, bins_count = np.histogram(abs_diff, bins=256, range=(0,255))
+                #print(f"count: {count}    bins_count:{bins_count}")
+                self.tot_hist = self.tot_hist + count
+                #print(f"hist: {self.tot_hist}")
+                
+
                 tot.append(val)
 
+        self.eval_psnr = -np.mean(tot)
         print(f"Total images is {len(tot)}")
-        print(f"The average PSRN: {np.mean(tot)}")
+        print(f"The average PSRN: {self.eval_psnr}")
+
+    def saveHist(self):
+        plt.bar(list(np.arange(0, 256, 1, dtype=int)), self.tot_hist, color ='maroon',  width = 0.4)
+        plt.savefig(self.report+".png", dpi=199) 
+        shutil.move(self.report+".png", f"{self.report}/")
+
+    def saveBestParams(self): 
+        print(f"report name: {self.report}")
+        with open(self.report+".txt", 'w') as f:
+            print(self.best_params, file=f)
+            print(f"Eval PSNR: {self.eval_psnr}", file=f)
+        shutil.move(self.report+".txt", f"{self.report}/")
+      
 
     def applyBestPredictedParams(self):
         self.SCALE    = self.best_params['SCALE']  

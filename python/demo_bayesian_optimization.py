@@ -40,21 +40,30 @@ demo.setDataset(args.dataset_dir)
 demo.run_bayesian_opt()
 
 demo.applyBestPredictedParams()
-#demo.eval()
-
+demo.eval()
+demo.saveHist()
+demo.saveBestParams()
 print(demo.best_params)
 
-output_dir = "res"
-frame_interpolation_video = "output_frame_interpolation.avi"
-original_video = "output_original.avi"
-comp_video = "output.mp4"
 
 
-demo.interpolate_frame(args.dataset_dir, output_dir)
-demo.create_video(os.path.join(demo.root_dir, output_dir), frame_interpolation_video)
-demo.create_video(args.dataset_dir, original_video)
 
-os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
-demo.info()
+
+
+######################################################
+# Create the videos of original and interpolated one #
+######################################################
+#output_dir = "res"
+#frame_interpolation_video = "output_frame_interpolation.avi"
+#original_video = "output_original.avi"
+#comp_video = "output.mp4"
+#
+#
+#demo.interpolate_frame(args.dataset_dir, output_dir)
+#demo.create_video(os.path.join(demo.root_dir, output_dir), frame_interpolation_video)
+#demo.create_video(args.dataset_dir, original_video)
+#
+#os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
+#demo.info()
 
 

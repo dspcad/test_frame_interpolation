@@ -38,6 +38,6 @@ test1.interpolate_frame(args.input_dir, output_dir)
 test1.create_video(os.path.join(test1.root_dir, output_dir), frame_interpolation_video)
 test1.create_video(args.input_dir, original_video)
 
-os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
+#os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map '[vid]' -c:v libx264 -crf 23 -preset veryfast {comp_video}")
 
-
+os.system(f"ffmpeg -i {original_video} -i {frame_interpolation_video} -filter_complex hstack -c:v libx264 -crf 23 -preset veryfast {comp_video}")
