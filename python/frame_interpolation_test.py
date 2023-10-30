@@ -90,7 +90,17 @@ class FrameInterpolationTest:
 
     def setDataset(self, dataset_dir):
         self.dataset_dir = dataset_dir
-        self.report = self.dataset_dir.replace("/","_")+"report"
+
+        self.report = self.dataset_dir.replace("/","_")
+        if self.report[-1] == '_':
+            self.report = self.report+"report"
+        else:
+            self.report = self.report+"_report"
+
+        print("========= Dataset ==========");
+        print(f"  Dataset: {self.dataset_dir}")
+        print("===========================");
+
         if os.path.isdir(self.report):
             shutil.rmtree(self.report)
 
