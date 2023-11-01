@@ -60,6 +60,7 @@ class FrameInterpolationTest:
         self.info()
         self.report = "test_res"
         self.eval_psnr = 0
+        self.eval_ssim = 0
 
 
     def info(self):
@@ -203,7 +204,7 @@ class FrameInterpolationTest:
                 cv2.imwrite(os.path.join(output_path, natsort_file_names[i]), frame)
 
 
-    def psnr_or_ssim(self, x, img_1_path, img_2_path, ground_truth_path):
+    def psnr_or_ssim(self, x, img_1_path, img_2_path, ground_truth_path, obj_fun='PSNR'):
         "Evaluate the objective function PSRN or SSIM"
         #PARAMS
         SCALE  = x[0]
@@ -243,9 +244,9 @@ class FrameInterpolationTest:
         #print(type(interpolated_img))
     
     
-        if self.obj_fun == "PSNR":
+        if obj_fun == "PSNR":
             return sk_psnr(ground_truth_img, interpolated_img)
-        elif self.obj_fun == "SSIM":
+        elif obj_fun == "SSIM":
             return sk_ssim(ground_truth_img, interpolated_img, data_range=ground_truth_img.max() - ground_truth_img.min(), channel_axis=2)
     
 
@@ -258,13 +259,13 @@ class FrameInterpolationTest:
             ground_truth_path = os.path.join(self.dataset_dir, f)
             img_1_path        = os.path.join(self.dataset_dir, self.dataset_file_names[self.dataset_file_names.index(f)-1])
             img_2_path        = os.path.join(self.dataset_dir, self.dataset_file_names[self.dataset_file_names.index(f)+1])
-            val               = -self.psnr_or_ssim(x, img_1_path, img_2_path, ground_truth_path)
+            val               = -self.psnr_or_ssim(x, img_1_path, img_2_path, ground_truth_path, self.obj_fun)
     
             tot.append(val)
     
-        batch_psnr = np.mean(tot)
-        print(f"Batch average loss: {-batch_psnr}")
-        return batch_psnr
+        batch_val = np.mean(tot)
+        print(f"Batch average loss {self.obj_fun}: {-batch_val}")
+        return batch_val
     
 
 
@@ -303,7 +304,8 @@ class FrameInterpolationTest:
     def eval(self):
         assert self.dataset_dir
         assert self.dataset_file_names
-        tot=[]
+        tot_psnr=[]
+        tot_ssim=[]
         self.tot_hist=np.zeros(256);
         params = [self.SCALE, self.LOD, self.KERNEL, self.STRIDE, self.NGRID]
         print(f"Start evaluating {self.dataset_dir} with the following parameters")
@@ -313,7 +315,8 @@ class FrameInterpolationTest:
                 ground_truth_path = os.path.join(self.dataset_dir, self.dataset_file_names[i])
                 img_1_path        = os.path.join(self.dataset_dir, self.dataset_file_names[i-1])
                 img_2_path        = os.path.join(self.dataset_dir, self.dataset_file_names[i+1])
-                val               = -self.psnr_or_ssim(params, img_1_path, img_2_path, ground_truth_path)
+                val_psnr          = -self.psnr_or_ssim(params, img_1_path, img_2_path, ground_truth_path, "PSNR")
+                val_ssim          = -self.psnr_or_ssim(params, img_1_path, img_2_path, ground_truth_path, "SSIM")
 
         
                 interpolated_img = cv2.imread(self.tmp_interpolated_frame)
@@ -326,11 +329,14 @@ class FrameInterpolationTest:
                 #print(f"hist: {self.tot_hist}")
                 
 
-                tot.append(val)
+                tot_psnr.append(val_psnr)
+                tot_ssim.append(val_ssim)
 
-        self.eval_psnr = -np.mean(tot)
-        print(f"Total images is {len(tot)}")
+        self.eval_psnr = -np.mean(tot_psnr)
+        self.eval_ssim = -np.mean(tot_ssim)
+        print(f"Total images is {len(tot_psnr)}")
         print(f"The average PSRN: {self.eval_psnr}")
+        print(f"The average SSIM: {self.eval_ssim}")
 
     def saveHist(self):
         plt.bar(list(np.arange(0, 256, 1, dtype=int)), self.tot_hist, color ='maroon',  width = 0.4)

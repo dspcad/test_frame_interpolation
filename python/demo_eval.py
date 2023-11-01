@@ -13,10 +13,6 @@ parser.add_argument('--bin_file', type=str,
                     help='A required bin file for frame interpolation')
 
 
-parser.add_argument('--obj_fun', type=str, default="PSNR",
-                    help='A opitonal objective function (either PSNR or SSIM), default is PSNR')
-
-funs = ["PSNR","SSIM"]
 
 
 args = parser.parse_args()
@@ -26,14 +22,18 @@ if(not os.path.isdir(args.dataset_dir)):
     print(f"{args.dataset_dir} cannot be found ... make sure input directory is correct")
     sys.exit(1)
 
-if args.obj_fun not in funs:
-    print(f"objective function: {args.obj_fun}")
-    print(f"Supported objective functions: {funs}")
-    sys.exit(1)
 
 
 
 demo = FrameInterpolationTest(args.bin_file)
 demo.setDataset(args.dataset_dir)
+
+demo.SCALE     = 0.01
+demo.LOD       = 5.0
+demo.THRESHOLD = 0.0
+demo.KERNEL    = 5
+demo.STRIDE    = 2
+demo.NGRID     = 8
+
 demo.eval()
 
