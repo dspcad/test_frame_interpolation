@@ -30,10 +30,11 @@ class FrameInterpolationTest:
         self.root_dir = os.path.dirname(os.path.realpath(__file__)) 
 
         self.SCALE     = 0.5
-        self.LOD       = 5.0
+        self.SPREAD    = 2.0
+        self.LOD       = 3.0
         self.THRESHOLD = 0.0
-        self.KERNEL    = 7
-        self.STRIDE    = 1
+        self.KERNEL    = 9
+        self.STRIDE    = 2
         self.NGRID     = 16
 
         self.best_params = {}
@@ -67,6 +68,7 @@ class FrameInterpolationTest:
         print("=========================");
         print(f"  root dir: {self.root_dir}")
         print(f"  SCALE: {self.SCALE}")
+        print(f"  SPREAD: {self.SPREAD}")
         print(f"  LOD: {self.LOD}")
         print(f"  THRESHOLD: {self.THRESHOLD}")
         print(f"  KERNEL: {self.KERNEL}")
@@ -81,6 +83,7 @@ class FrameInterpolationTest:
     def setAlgoParams(self, params) :
         "Set the parameters of the algorithms"
         self.SCALE     = params['SCALE']
+        self.SPREAD    = params['SPREAD']
         self.LOD       = params['LOD']
         self.THRESHOLD = params['THRESHOLD']
         self.KERNEL    = params['KERNEL']
@@ -142,21 +145,26 @@ class FrameInterpolationTest:
         "Interpolate the img_1 and img_2 based on the parameters"
         input1_name = os.path.join(self.root_dir, img_1)
         input2_name = os.path.join(self.root_dir, img_2)
-        print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {interpolated_res} ")
-        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}  {}".format(
-                self.bin_file,
-                input1_name,
-                input2_name,
-                self.SCALE,
-                self.LOD,
-                self.THRESHOLD,
-                self.KERNEL,
-                self.STRIDE,
-                self.NGRID,
-                interpolated_res,
-                SUPRESS_MSG
+        #print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --spread {self.SPREAD} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {interpolated_res} ")
+        
+
+        os.system(
+                "{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
+                    self.bin_file,
+                    input1_name,
+                    input2_name,
+                    self.SCALE,
+                    self.SPREAD,
+                    self.LOD,
+                    self.THRESHOLD,
+                    self.KERNEL,
+                    self.STRIDE,
+                    self.NGRID,
+                    interpolated_res,
+                    SUPRESS_MSG
+                )
             )
-        )
+
 
 
     @dispatch(str, str)
@@ -178,21 +186,24 @@ class FrameInterpolationTest:
             if i%2==1 and i<len(natsort_file_names)-1:
                 input1_name = os.path.join(img_dir, natsort_file_names[i-1])
                 input2_name = os.path.join(img_dir, natsort_file_names[i+1])
-                #print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {natsort_file_names[i]} ")
-                os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}  {}".format(
+                
+
+                os.system("{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
                         self.bin_file,
                         input1_name,
                         input2_name,
                         self.SCALE,
+                        self.SPREAD,
                         self.LOD,
                         self.THRESHOLD,
                         self.KERNEL,
                         self.STRIDE,
                         self.NGRID,
-                        natsort_file_names[i],
+                        interpolated_res,
                         SUPRESS_MSG
                     )
                 )
+
     
     
                 #print(f"{os.path.join(self.root_dir,natsort_file_names[i])} {output_path}")
@@ -207,7 +218,8 @@ class FrameInterpolationTest:
     def psnr_or_ssim(self, x, img_1_path, img_2_path, ground_truth_path, obj_fun='PSNR'):
         "Evaluate the objective function PSRN or SSIM"
         #PARAMS
-        SCALE  = x[0]
+        SCALE  = 0.5
+        SPREAD = x[0]
         LOD    = x[1]
         THRESHOLD = 0.0
         KERNEL = x[2]
@@ -215,14 +227,14 @@ class FrameInterpolationTest:
         NGRID  = x[4]
     
     
-        #print(f"SCALE: {SCALE}   LOD: {LOD}  THRESHOLD: {THRESHOLD}  KERNEL: {KERNEL}  STRIDE: {STRIDE}   NGRID: {NGRID}")
     
-    
-        os.system("{} --input1 {} --input2 {} --scaleFactor {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {}   {}".format(
+        #print(f"{self.bin_file} --input1 '{img_1_path}' --input2 '{img_2_path}' --scaleFactor {SCALE} --spread {SPREAD} --lod {LOD} --threshold {THRESHOLD} --kernel {KERNEL} --stride {STRIDE} --ngrid {NGRID} --out {self.tmp_interpolated_frame} {SUPRESS_MSG}")
+        os.system("{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
                         self.bin_file,
                         img_1_path,
                         img_2_path,
                         SCALE,
+                        SPREAD,
                         LOD,
                         THRESHOLD,
                         KERNEL,
@@ -232,7 +244,7 @@ class FrameInterpolationTest:
                         SUPRESS_MSG
                     )
                 )
-    
+
     
         interpolated_img = cv2.imread(self.tmp_interpolated_frame)
         ground_truth_img = cv2.imread(ground_truth_path)
