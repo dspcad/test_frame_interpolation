@@ -43,14 +43,15 @@ class FrameInterpolationTest:
         self.fps = 30
 
         #Bayesian Optimization parameters
-        self.n_calls = 10
+        self.n_calls = 40
         self.batch_size = 5
 
         self.SPACE=[
-            skopt.space.Real(0.0, 1.0, name='SCALE', prior='uniform'),
+            skopt.space.Real(1.0, 9.0, name='SPREAD', prior='uniform'),
+            #skopt.space.Integer(1, 9, name='SPREAD', prior='uniform'),
             skopt.space.space.Categorical([0,1,2,3,4,5], name='LOD'),
             skopt.space.space.Categorical([3,5,7,9], name='KERNEL'),
-            skopt.space.space.Categorical([1,3,5,7,9], name='STRIDE'),
+            skopt.space.Integer(1, 9, name='STRIDE', prior='uniform'),
             skopt.space.space.Categorical([4,8,16], name='NGRID')]
 
         self.obj_fun = "PSNR"
@@ -58,7 +59,6 @@ class FrameInterpolationTest:
         self.dataset_file_names = None
         self.tmp_interpolated_frame = "tmp_frame_interp_res.png"
 
-        self.info()
         self.report = "test_res"
         self.eval_psnr = 0
         self.eval_ssim = 0
@@ -180,6 +180,7 @@ class FrameInterpolationTest:
             shutil.rmtree(output_path)
     
         os.mkdir(output_path)
+
         #print(f"output: {output_path}")
         for i in tqdm(range(0,len(natsort_file_names)), position=0, leave=True):
     
@@ -188,6 +189,7 @@ class FrameInterpolationTest:
                 input2_name = os.path.join(img_dir, natsort_file_names[i+1])
                 
 
+                #print(f"{self.bin_file} --input1 '{input1_name}' --input2 '{input2_name}' --scaleFactor {self.SCALE} --spread {self.SPREAD} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {natsort_file_names[i]} {SUPRESS_MSG}")
                 os.system("{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
                         self.bin_file,
                         input1_name,
@@ -199,7 +201,7 @@ class FrameInterpolationTest:
                         self.KERNEL,
                         self.STRIDE,
                         self.NGRID,
-                        interpolated_res,
+                        natsort_file_names[i],
                         SUPRESS_MSG
                     )
                 )
@@ -216,7 +218,7 @@ class FrameInterpolationTest:
 
 
     def psnr_or_ssim(self, x, img_1_path, img_2_path, ground_truth_path, obj_fun='PSNR'):
-        "Evaluate the objective function PSRN or SSIM"
+        "Evaluate the objective function PSNR or SSIM"
         #PARAMS
         SCALE  = 0.5
         SPREAD = x[0]
@@ -244,6 +246,8 @@ class FrameInterpolationTest:
                         SUPRESS_MSG
                     )
                 )
+
+        
 
     
         interpolated_img = cv2.imread(self.tmp_interpolated_frame)
@@ -289,14 +293,14 @@ class FrameInterpolationTest:
                   self.SPACE,              # the bounds on each dimension of x
                   acq_func="PI",           # the acquisition function
                   n_calls=self.n_calls,    # the number of evaluations of f
-                  n_random_starts=5,       # the number of random initialization points
+                  n_initial_points=20,       # the number of random initialization points
                   noise=0.1**2,            # the noise level (optional)
                   random_state=1234)       # the random seed
 
 
         #print(res)
         print("Best Predicted Params:")
-        print(f"    SCALE: {res.x[0]}")
+        print(f"   SPREAD: {res.x[0]}")
         print(f"      LOD: {res.x[1]}")
         print(f"   KERNEL: {res.x[2]}")
         print(f"   STRIDE: {res.x[3]}")
@@ -304,7 +308,7 @@ class FrameInterpolationTest:
         print(f"    {self.obj_fun}: {-res.fun}")
 
 
-        self.best_params['SCALE']  = res.x[0]
+        self.best_params['SPREAD'] = res.x[0]
         self.best_params['LOD']    = res.x[1]
         self.best_params['KERNEL'] = res.x[2]
         self.best_params['STRIDE'] = res.x[3]
@@ -319,8 +323,15 @@ class FrameInterpolationTest:
         tot_psnr=[]
         tot_ssim=[]
         self.tot_hist=np.zeros(256);
-        params = [self.SCALE, self.LOD, self.KERNEL, self.STRIDE, self.NGRID]
+
+        #parameters
+        params = [self.SPREAD, self.LOD, self.KERNEL, self.STRIDE, self.NGRID]
         print(f"Start evaluating {self.dataset_dir} with the following parameters")
+        print(f"    SPREAD: {self.SPREAD}")
+        print(f"    LOD:    {self.LOD}")
+        print(f"    KERNEL: {self.KERNEL}")
+        print(f"    STRIDE: {self.STRIDE}")
+        print(f"    NGRID:  {self.NGRID}")
         self.info()
         for i in tqdm(range(0,len(self.dataset_file_names)), position=0, leave=True):
             if i%2==1 and i<len(self.dataset_file_names)-1:
@@ -347,7 +358,7 @@ class FrameInterpolationTest:
         self.eval_psnr = -np.mean(tot_psnr)
         self.eval_ssim = -np.mean(tot_ssim)
         print(f"Total images is {len(tot_psnr)}")
-        print(f"The average PSRN: {self.eval_psnr}")
+        print(f"The average PSNR: {self.eval_psnr}")
         print(f"The average SSIM: {self.eval_ssim}")
 
     def saveHist(self):
@@ -364,7 +375,7 @@ class FrameInterpolationTest:
       
 
     def applyBestPredictedParams(self):
-        self.SCALE    = self.best_params['SCALE']  
+        self.SPREAD   = self.best_params['SPREAD']  
         self.LOD      = self.best_params['LOD']    
         self.KERNEL   = self.best_params['KERNEL'] 
         self.STRIDE   = self.best_params['STRIDE'] 
