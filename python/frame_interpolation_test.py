@@ -44,7 +44,7 @@ class FrameInterpolationTest:
         self.fps = 30
 
         #Bayesian Optimization parameters
-        self.n_calls = 40
+        self.n_calls = 20
         self.batch_size = 5
 
         self.SPACE=[
@@ -227,6 +227,7 @@ class FrameInterpolationTest:
         KERNEL = x[2]
         STRIDE = x[3]
         NGRID  = x[4]
+
     
     
     
@@ -297,7 +298,19 @@ class FrameInterpolationTest:
         return np.mean(tot_vmaf)
 
 
-    def scene_vmaf(self):
+    def scene_vmaf(self, x):
+        #PARAMS
+        self.SCALE  = 0.5
+        self.SPREAD = x[0]
+        self.LOD    = x[1]
+        self.THRESHOLD = 0.0
+        self.KERNEL = x[2]
+        self.STRIDE = x[3]
+        self.NGRID  = x[4]
+    
+
+        self.info()
+
         frame_interpolation_video = self.report +"_interpolated.avi"
         original_video = self.report +"_original.avi"
         output_dir = self.report
@@ -319,12 +332,13 @@ class FrameInterpolationTest:
 
     def f(self, x):
         "The wrapper of the objective function"
-        #batch_val = -self.batch_psnr_or_ssim(x)
-        vmaf_val =  -self.scene_vmaf(x)
+        #val = -self.batch_psnr_or_ssim(x)
+        val =  self.scene_vmaf(x)
    
 
-        print(f"Batch average loss {self.obj_fun}: {-batch_val}")
-        return batch_val
+        #print(f"Batch average loss {self.obj_fun}: {-batch_val}")
+        print(f"Average VMAF: {val}")
+        return -val
     
 
 
@@ -336,7 +350,7 @@ class FrameInterpolationTest:
                   self.SPACE,              # the bounds on each dimension of x
                   acq_func="PI",           # the acquisition function
                   n_calls=self.n_calls,    # the number of evaluations of f
-                  n_initial_points=20,       # the number of random initialization points
+                  n_initial_points=10,       # the number of random initialization points
                   noise=0.1**2,            # the noise level (optional)
                   random_state=1234)       # the random seed
 
