@@ -13,8 +13,8 @@ parser.add_argument('--bin_file', type=str,
                     help='A required bin file for frame interpolation')
 
 
-parser.add_argument('--obj_fun', type=str, default="PSNR",
-                    help='A opitonal objective function (either PSNR or SSIM), default is PSNR')
+parser.add_argument('--calls', type=int, default="20",
+                    help='A opitonal number for running the algorithm')
 
 
 
@@ -28,15 +28,13 @@ if(not os.path.isdir(args.dataset_dir)):
     print(f"{args.dataset_dir} cannot be found ... make sure input directory is correct")
     sys.exit(1)
 
-if args.obj_fun not in funs:
-    print(f"objective function: {args.obj_fun}")
-    print(f"Supported objective functions: {funs}")
-    sys.exit(1)
 
 
 
 demo = FrameInterpolationTest(args.bin_file)
+demo.n_calls = args.calls;
 demo.setDataset(args.dataset_dir)
+demo.info()
 demo.run_bayesian_opt()
 
 demo.applyBestPredictedParams()

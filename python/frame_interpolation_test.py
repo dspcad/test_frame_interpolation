@@ -12,6 +12,7 @@ import random
 import numpy as np
 np.random.seed(237)
 import matplotlib.pyplot as plt
+import xml.etree.ElementTree as ET
 
 SUPRESS_MSG = ''
 if platform.system() == 'Linux':
@@ -148,8 +149,7 @@ class FrameInterpolationTest:
         #print(f"{self.bin_file} --input1 {input1_name} --input2 {input2_name} --scaleFactor {self.SCALE} --spread {self.SPREAD} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {interpolated_res} ")
         
 
-        os.system(
-                "{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
+        os.system("xvfb-run -a {} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
                     self.bin_file,
                     input1_name,
                     input2_name,
@@ -190,7 +190,7 @@ class FrameInterpolationTest:
                 
 
                 #print(f"{self.bin_file} --input1 '{input1_name}' --input2 '{input2_name}' --scaleFactor {self.SCALE} --spread {self.SPREAD} --lod {self.LOD} --threshold {self.THRESHOLD} --kernel {self.KERNEL} --stride {self.STRIDE} --ngrid {self.NGRID} --out {natsort_file_names[i]} {SUPRESS_MSG}")
-                os.system("{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
+                os.system("xvfb-run -a {} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
                         self.bin_file,
                         input1_name,
                         input2_name,
@@ -231,7 +231,7 @@ class FrameInterpolationTest:
     
     
         #print(f"{self.bin_file} --input1 '{img_1_path}' --input2 '{img_2_path}' --scaleFactor {SCALE} --spread {SPREAD} --lod {LOD} --threshold {THRESHOLD} --kernel {KERNEL} --stride {STRIDE} --ngrid {NGRID} --out {self.tmp_interpolated_frame} {SUPRESS_MSG}")
-        os.system("{} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
+        os.system("xvfb-run -a {} --input1 '{}' --input2 '{}' --scaleFactor {} --spread {} --lod {} --threshold {} --kernel {} --stride {} --ngrid {} --out {} {}".format(
                         self.bin_file,
                         img_1_path,
                         img_2_path,
@@ -264,10 +264,9 @@ class FrameInterpolationTest:
             return sk_psnr(ground_truth_img, interpolated_img)
         elif obj_fun == "SSIM":
             return sk_ssim(ground_truth_img, interpolated_img, data_range=ground_truth_img.max() - ground_truth_img.min(), channel_axis=2)
-    
+ 
 
-    def f(self, x):
-        "The wrapper of the objective function"
+    def batch_psnr_or_ssim(self, x):
         batch = random.choices(self.dataset_file_names[1:-1], k=self.batch_size)
     
         tot=[]
@@ -279,7 +278,51 @@ class FrameInterpolationTest:
     
             tot.append(val)
     
-        batch_val = np.mean(tot)
+        return np.mean(tot)
+
+
+        
+    def getAveVMAF(self, output_f):
+        tree = ET.parse(output_f)
+
+        # get the parent tag
+        root = tree.getroot()
+
+        tot_vmaf = []
+        for i in range(1,len(root[2]),2):
+            tbl = root[2][i].attrib
+            tot_vmaf.append(float(tbl['vmaf']))
+            #print(f"{tbl['frameNum']}    {tbl['vmaf']}")
+
+        return np.mean(tot_vmaf)
+
+
+    def scene_vmaf(self):
+        frame_interpolation_video = self.report +"_interpolated.avi"
+        original_video = self.report +"_original.avi"
+        output_dir = self.report
+
+        self.interpolate_frame(self.dataset_dir, output_dir)
+        self.create_video(os.path.join(self.root_dir, output_dir), frame_interpolation_video)
+        self.create_video(self.dataset_dir, original_video)
+
+        
+        os.system(f"ffmpeg -i {frame_interpolation_video} -i {original_video} -lavfi libvmaf=log_path=output.xml -f null -")
+        vmaf = self.getAveVMAF("output.xml")
+        shutil.move(frame_interpolation_video, f"{self.report}/")
+        shutil.move(original_video, f"{self.report}/")
+        shutil.move("output.xml", f"{self.report}/")
+
+        return vmaf
+
+
+
+    def f(self, x):
+        "The wrapper of the objective function"
+        #batch_val = -self.batch_psnr_or_ssim(x)
+        vmaf_val =  -self.scene_vmaf(x)
+   
+
         print(f"Batch average loss {self.obj_fun}: {-batch_val}")
         return batch_val
     
