@@ -55,8 +55,9 @@ class FrameInterpolationTest:
             skopt.space.Integer(1, 9, name='STRIDE', prior='uniform'),
             skopt.space.space.Categorical([4,8,16], name='NGRID')]
 
-        self.obj_fun = "PSNR"
+        self.obj_fun = "VMAF"
         self.dataset_dir = None
+        self.dataset_list = []
         self.dataset_file_names = None
         self.tmp_interpolated_frame = "tmp_frame_interp_res.png"
 
@@ -65,9 +66,8 @@ class FrameInterpolationTest:
         self.eval_ssim = 0
 
 
-    def info(self):
-        print("=========================");
-        print(f"  root dir: {self.root_dir}")
+
+    def info_params(self):
         print(f"  SCALE: {self.SCALE}")
         print(f"  SPREAD: {self.SPREAD}")
         print(f"  LOD: {self.LOD}")
@@ -75,9 +75,15 @@ class FrameInterpolationTest:
         print(f"  KERNEL: {self.KERNEL}")
         print(f"  STRIDE: {self.STRIDE}")
         print(f"  NGRID: {self.NGRID}")
+
+    def info(self):
+        print("=========================");
+        print(f"  root dir: {self.root_dir}")
+        self.info_params()
         print("")
+        print(f"  dataset list: {self.dataset_list}")
         print(f"  n_calls: {self.n_calls}")
-        print(f"  batch_size: {self.batch_size}")
+        print(f"  batch_size (PSNR/SSIM): {self.batch_size}")
         print("=========================");
  
 
@@ -103,7 +109,7 @@ class FrameInterpolationTest:
             self.report = self.report+"_report"
 
         print("========= Dataset ==========");
-        print(f"  Dataset: {self.dataset_dir}")
+        print(f"  Target Dataset: {self.dataset_dir}")
         print("===========================");
 
         if os.path.isdir(self.report):
@@ -116,7 +122,16 @@ class FrameInterpolationTest:
         files = [f for f in files if f.endswith(".png")]
         self.dataset_file_names = natsorted(files)
 
-        
+    def setDatasetList(self, dataset_dirs):
+        self.dataset_list.extend(dataset_dirs)
+
+        print("========= Dataset ==========");
+        print(f"  Dataset: {dataset_dirs} is added.")
+        print(f"  Dataset List: {self.dataset_list}")
+        print("===========================");
+
+
+       
 
     def create_video(self, img_dir, video_name):
         "Create a video of img_dir"
@@ -299,6 +314,13 @@ class FrameInterpolationTest:
 
 
     def scene_vmaf(self, x):
+        self.setDataset(random.choice(self.dataset_list))
+        print(f"========== VMAF ==========")
+        print(f"  Chosen dataset: {self.dataset_dir}")
+           
+        assert self.dataset_dir
+        assert self.dataset_file_names
+
         #PARAMS
         self.SCALE  = 0.5
         self.SPREAD = x[0]
@@ -309,7 +331,7 @@ class FrameInterpolationTest:
         self.NGRID  = x[4]
     
 
-        self.info()
+        self.info_params()
 
         frame_interpolation_video = self.report +"_interpolated.avi"
         original_video = self.report +"_original.avi"
@@ -332,19 +354,20 @@ class FrameInterpolationTest:
 
     def f(self, x):
         "The wrapper of the objective function"
-        #val = -self.batch_psnr_or_ssim(x)
-        val =  self.scene_vmaf(x)
+        if self.obj_fun == "VMAF":
+            val =  self.scene_vmaf(x)
+        else:
+            val = self.batch_psnr_or_ssim(x)
    
 
         #print(f"Batch average loss {self.obj_fun}: {-batch_val}")
-        print(f"Average VMAF: {val}")
+        print(f"Average {self.obj_fun}: {val}")
         return -val
     
 
 
     def run_bayesian_opt(self):
-        assert self.dataset_dir
-        assert self.dataset_file_names
+
 
         res = gp_minimize(self.f,          # the function to minimize
                   self.SPACE,              # the bounds on each dimension of x
@@ -374,7 +397,10 @@ class FrameInterpolationTest:
         os.remove(self.tmp_interpolated_frame)
 
 
-    def eval(self):
+    def eval(self, dataset_dir):
+        self.setDataset(dataset_dir)
+        print(f"========== Eval ==========")
+        print(f"  Chosen dataset: {self.dataset_dir}")
         assert self.dataset_dir
         assert self.dataset_file_names
         tot_psnr=[]
