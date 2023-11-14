@@ -64,6 +64,7 @@ class FrameInterpolationTest:
         self.report = "test_res"
         self.eval_psnr = 0
         self.eval_ssim = 0
+        self.eval_vmaf = 0
 
 
 
@@ -313,8 +314,8 @@ class FrameInterpolationTest:
         return np.mean(tot_vmaf)
 
 
-    def scene_vmaf(self, x):
-        self.setDataset(random.choice(self.dataset_list))
+    def scene_vmaf(self, x, dataset_dir):
+        self.setDataset(dataset_dir)
         print(f"========== VMAF ==========")
         print(f"  Chosen dataset: {self.dataset_dir}")
            
@@ -355,7 +356,7 @@ class FrameInterpolationTest:
     def f(self, x):
         "The wrapper of the objective function"
         if self.obj_fun == "VMAF":
-            val =  self.scene_vmaf(x)
+            val =  self.scene_vmaf(x,random.choice(self.dataset_list))
         else:
             val = self.batch_psnr_or_ssim(x)
    
@@ -397,36 +398,64 @@ class FrameInterpolationTest:
         os.remove(self.tmp_interpolated_frame)
 
 
-    def eval(self, dataset_dir):
+    def eval(self, x, dataset_dir):
         self.setDataset(dataset_dir)
-        print(f"========== Eval ==========")
+        print(f"========== VMAF ==========")
         print(f"  Chosen dataset: {self.dataset_dir}")
+           
         assert self.dataset_dir
         assert self.dataset_file_names
+
+        #PARAMS
+        self.SCALE  = 0.5
+        self.SPREAD = x[0]
+        self.LOD    = x[1]
+        self.THRESHOLD = 0.0
+        self.KERNEL = x[2]
+        self.STRIDE = x[3]
+        self.NGRID  = x[4]
+    
+
+        print(f"Start evaluating {self.dataset_dir} with the following parameters")
+        self.info_params()
+
+        frame_interpolation_video = self.report +"_interpolated.avi"
+        original_video = self.report +"_original.avi"
+        output_dir = self.report
+
+        self.interpolate_frame(self.dataset_dir, output_dir)
+        self.create_video(os.path.join(self.root_dir, output_dir), frame_interpolation_video)
+        self.create_video(self.dataset_dir, original_video)
+
+        
+        os.system(f"ffmpeg -i {frame_interpolation_video} -i {original_video} -lavfi libvmaf=log_path=output.xml -f null -")
+        self.eval_vmaf = self.getAveVMAF("output.xml")
+        shutil.move(frame_interpolation_video, f"{self.report}/")
+        shutil.move(original_video, f"{self.report}/")
+        shutil.move("output.xml", f"{self.report}/")
+
+
+       
         tot_psnr=[]
         tot_ssim=[]
         self.tot_hist=np.zeros(256);
 
-        #parameters
-        params = [self.SPREAD, self.LOD, self.KERNEL, self.STRIDE, self.NGRID]
-        print(f"Start evaluating {self.dataset_dir} with the following parameters")
-        print(f"    SPREAD: {self.SPREAD}")
-        print(f"    LOD:    {self.LOD}")
-        print(f"    KERNEL: {self.KERNEL}")
-        print(f"    STRIDE: {self.STRIDE}")
-        print(f"    NGRID:  {self.NGRID}")
-        self.info()
+        
         for i in tqdm(range(0,len(self.dataset_file_names)), position=0, leave=True):
             if i%2==1 and i<len(self.dataset_file_names)-1:
                 ground_truth_path = os.path.join(self.dataset_dir, self.dataset_file_names[i])
-                img_1_path        = os.path.join(self.dataset_dir, self.dataset_file_names[i-1])
-                img_2_path        = os.path.join(self.dataset_dir, self.dataset_file_names[i+1])
-                val_psnr          = -self.psnr_or_ssim(params, img_1_path, img_2_path, ground_truth_path, "PSNR")
-                val_ssim          = -self.psnr_or_ssim(params, img_1_path, img_2_path, ground_truth_path, "SSIM")
+                interpolated_path = os.path.join(self.report, self.dataset_file_names[i])
+                #print(f"ground_truth_path: {ground_truth_path}");
+                #print(f"interpolated_path: {interpolated_path}");
 
-        
-                interpolated_img = cv2.imread(self.tmp_interpolated_frame)
+                interpolated_img = cv2.imread(interpolated_path)
                 ground_truth_img = cv2.imread(ground_truth_path)
+
+
+
+                tot_psnr.append(sk_psnr(ground_truth_img, interpolated_img))
+                tot_ssim.append(sk_ssim(ground_truth_img, interpolated_img, data_range=ground_truth_img.max() - ground_truth_img.min(), channel_axis=2))
+
 
                 abs_diff = abs(ground_truth_img - interpolated_img)
                 count, bins_count = np.histogram(abs_diff, bins=256, range=(0,255))
@@ -435,14 +464,13 @@ class FrameInterpolationTest:
                 #print(f"hist: {self.tot_hist}")
                 
 
-                tot_psnr.append(val_psnr)
-                tot_ssim.append(val_ssim)
 
-        self.eval_psnr = -np.mean(tot_psnr)
-        self.eval_ssim = -np.mean(tot_ssim)
+        self.eval_psnr = np.mean(tot_psnr)
+        self.eval_ssim = np.mean(tot_ssim)
         print(f"Total images is {len(tot_psnr)}")
         print(f"The average PSNR: {self.eval_psnr}")
         print(f"The average SSIM: {self.eval_ssim}")
+        print(f"The average VMAF: {self.eval_vmaf}")
 
     def saveHist(self):
         plt.bar(list(np.arange(0, 256, 1, dtype=int)), self.tot_hist, color ='maroon',  width = 0.4)
