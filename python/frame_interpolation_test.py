@@ -101,6 +101,7 @@ class FrameInterpolationTest:
 
 
     def setDataset(self, dataset_dir):
+        assert dataset_dir, f"Dataset Dir: {dataset_dir}"
         self.dataset_dir = dataset_dir
 
         self.report = self.dataset_dir.replace("/","_")
@@ -314,56 +315,21 @@ class FrameInterpolationTest:
         return np.mean(tot_vmaf)
 
 
-    def scene_vmaf(self, x, dataset_dir):
-        self.setDataset(dataset_dir)
-        print(f"========== VMAF ==========")
-        print(f"  Chosen dataset: {self.dataset_dir}")
-           
-        assert self.dataset_dir
-        assert self.dataset_file_names
-
-        #PARAMS
-        self.SCALE  = 0.5
-        self.SPREAD = x[0]
-        self.LOD    = x[1]
-        self.THRESHOLD = 0.0
-        self.KERNEL = x[2]
-        self.STRIDE = x[3]
-        self.NGRID  = x[4]
-    
-
-        self.info_params()
-
-        output_dir = self.report
-
-        self.interpolate_frame(self.dataset_dir, output_dir)
-
-
-        frame_interpolation_video = self.report +"_interpolated.avi"
-        original_video = self.report +"_original.avi"
-        self.create_video(os.path.join(self.root_dir, output_dir), frame_interpolation_video)
-        self.create_video(self.dataset_dir, original_video)
-
-        
-        os.system(f"ffmpeg -i {frame_interpolation_video} -i {original_video} -lavfi libvmaf=log_path=output.xml -f null -")
-        vmaf = self.getAveVMAF("output.xml")
-        shutil.move(frame_interpolation_video, f"{self.report}/")
-        shutil.move(original_video, f"{self.report}/")
-        shutil.move("output.xml", f"{self.report}/")
-
-        return vmaf
-
 
 
     def f(self, x):
         "The wrapper of the objective function"
-        if self.obj_fun == "VMAF":
-            val =  self.scene_vmaf(x,random.choice(self.dataset_list))
-        else:
-            val = self.batch_psnr_or_ssim(x)
+        #if self.obj_fun == "VMAF":
+        #    val =  self.scene_vmaf(x,random.choice(self.dataset_list))
+        #else:
+        #    val = self.batch_psnr_or_ssim(x)
    
 
+        val = self.eval(x,random.choice(self.dataset_list))
         #print(f"Batch average loss {self.obj_fun}: {-batch_val}")
+
+
+
         print(f"Average {self.obj_fun}: {val}")
         return -val
     
@@ -416,6 +382,8 @@ class FrameInterpolationTest:
         shutil.move(original_video, f"{self.report}/")
         shutil.move("output.xml", f"{self.report}/")
 
+        print(f"The average VMAF: {self.eval_vmaf}")
+
 
     def psnr(self):
         "PSNR evaluation"
@@ -437,6 +405,7 @@ class FrameInterpolationTest:
 
 
         self.eval_psnr = np.mean(tot_psnr)
+        print(f"The average PSNR: {self.eval_psnr}")
 
 
     def ssim(self):
@@ -455,6 +424,7 @@ class FrameInterpolationTest:
 
 
         self.eval_ssim = np.mean(tot_ssim)
+        print(f"The average SSIM: {self.eval_ssim}")
 
     def psnr_ssim(self):
         "PSNR/SSIM evaluation"
@@ -490,13 +460,13 @@ class FrameInterpolationTest:
         self.eval_psnr = np.mean(tot_psnr)
         self.eval_ssim = np.mean(tot_ssim)
 
+        print(f"The average PSNR: {self.eval_psnr}")
+        print(f"The average SSIM: {self.eval_ssim}")
 
     def eval(self, x, dataset_dir):
         self.setDataset(dataset_dir)
         print(f"  Chosen dataset: {self.dataset_dir}")
            
-        assert self.dataset_dir
-        assert self.dataset_file_names
 
         #PARAMS
         self.SCALE  = 0.5
@@ -520,12 +490,11 @@ class FrameInterpolationTest:
         self.vmaf()
         #self.psnr()
         #self.ssim()
-        self.psnr_ssim()
+        #self.psnr_ssim()
         
        
-        print(f"The average PSNR: {self.eval_psnr}")
-        print(f"The average SSIM: {self.eval_ssim}")
-        print(f"The average VMAF: {self.eval_vmaf}")
+
+        return self.eval_vmaf
 
     def saveHist(self):
         plt.bar(list(np.arange(0, 256, 1, dtype=int)), self.tot_hist, color ='maroon',  width = 0.4)
