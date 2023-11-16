@@ -334,11 +334,13 @@ class FrameInterpolationTest:
 
         self.info_params()
 
-        frame_interpolation_video = self.report +"_interpolated.avi"
-        original_video = self.report +"_original.avi"
         output_dir = self.report
 
         self.interpolate_frame(self.dataset_dir, output_dir)
+
+
+        frame_interpolation_video = self.report +"_interpolated.avi"
+        original_video = self.report +"_original.avi"
         self.create_video(os.path.join(self.root_dir, output_dir), frame_interpolation_video)
         self.create_video(self.dataset_dir, original_video)
 
@@ -398,49 +400,64 @@ class FrameInterpolationTest:
         os.remove(self.tmp_interpolated_frame)
 
 
-    def eval(self, x, dataset_dir):
-        self.setDataset(dataset_dir)
-        print(f"========== VMAF ==========")
-        print(f"  Chosen dataset: {self.dataset_dir}")
-           
-        assert self.dataset_dir
-        assert self.dataset_file_names
-
-        #PARAMS
-        self.SCALE  = 0.5
-        self.SPREAD = x[0]
-        self.LOD    = x[1]
-        self.THRESHOLD = 0.0
-        self.KERNEL = x[2]
-        self.STRIDE = x[3]
-        self.NGRID  = x[4]
-    
-
-        print(f"Start evaluating {self.dataset_dir} with the following parameters")
-        self.info_params()
-
+    def vmaf(self):
+        "VMAF evaluation"
+        output_dir = self.report
         frame_interpolation_video = self.report +"_interpolated.avi"
         original_video = self.report +"_original.avi"
-        output_dir = self.report
-
-        #interpolate all odd frames in dataset dir
-        self.interpolate_frame(self.dataset_dir, output_dir)
-   
-        
-        #VMAF evaluation
         self.create_video(os.path.join(self.root_dir, output_dir), frame_interpolation_video)
         self.create_video(self.dataset_dir, original_video)
 
         
         os.system(f"ffmpeg -i {frame_interpolation_video} -i {original_video} -lavfi libvmaf=log_path=output.xml -f null -")
         self.eval_vmaf = self.getAveVMAF("output.xml")
+
         shutil.move(frame_interpolation_video, f"{self.report}/")
         shutil.move(original_video, f"{self.report}/")
         shutil.move("output.xml", f"{self.report}/")
 
 
-       
-        #PSNR/SSIM evaluation
+    def psnr(self):
+        "PSNR evaluation"
+        tot_psnr=[]
+        self.tot_hist=np.zeros(256);
+
+        
+        for i in tqdm(range(0,len(self.dataset_file_names)), position=0, leave=True):
+            if i%2==1 and i<len(self.dataset_file_names)-1:
+                ground_truth_path = os.path.join(self.dataset_dir, self.dataset_file_names[i])
+                interpolated_path = os.path.join(self.report, self.dataset_file_names[i])
+                #print(f"ground_truth_path: {ground_truth_path}");
+                #print(f"interpolated_path: {interpolated_path}");
+
+                interpolated_img = cv2.imread(interpolated_path)
+                ground_truth_img = cv2.imread(ground_truth_path)
+
+                tot_psnr.append(sk_psnr(ground_truth_img, interpolated_img))
+
+
+        self.eval_psnr = np.mean(tot_psnr)
+
+
+    def ssim(self):
+        "SSIM evaluation"
+        tot_ssim=[]
+        
+        for i in tqdm(range(0,len(self.dataset_file_names)), position=0, leave=True):
+            if i%2==1 and i<len(self.dataset_file_names)-1:
+                ground_truth_path = os.path.join(self.dataset_dir, self.dataset_file_names[i])
+                interpolated_path = os.path.join(self.report, self.dataset_file_names[i])
+
+                interpolated_img = cv2.imread(interpolated_path)
+                ground_truth_img = cv2.imread(ground_truth_path)
+
+                tot_ssim.append(sk_ssim(ground_truth_img, interpolated_img, data_range=ground_truth_img.max() - ground_truth_img.min(), channel_axis=2))
+
+
+        self.eval_ssim = np.mean(tot_ssim)
+
+    def psnr_ssim(self):
+        "PSNR/SSIM evaluation"
         tot_psnr=[]
         tot_ssim=[]
         self.tot_hist=np.zeros(256);
@@ -472,7 +489,40 @@ class FrameInterpolationTest:
 
         self.eval_psnr = np.mean(tot_psnr)
         self.eval_ssim = np.mean(tot_ssim)
-        print(f"Total images is {len(tot_psnr)}")
+
+
+    def eval(self, x, dataset_dir):
+        self.setDataset(dataset_dir)
+        print(f"  Chosen dataset: {self.dataset_dir}")
+           
+        assert self.dataset_dir
+        assert self.dataset_file_names
+
+        #PARAMS
+        self.SCALE  = 0.5
+        self.SPREAD = x[0]
+        self.LOD    = x[1]
+        self.THRESHOLD = 0.0
+        self.KERNEL = x[2]
+        self.STRIDE = x[3]
+        self.NGRID  = x[4]
+    
+
+        print(f"Start evaluating {self.dataset_dir} with the following parameters")
+        self.info_params()
+
+        output_dir = self.report
+
+        #interpolate all odd frames in dataset dir
+        self.interpolate_frame(self.dataset_dir, output_dir)
+   
+        
+        self.vmaf()
+        #self.psnr()
+        #self.ssim()
+        self.psnr_ssim()
+        
+       
         print(f"The average PSNR: {self.eval_psnr}")
         print(f"The average SSIM: {self.eval_ssim}")
         print(f"The average VMAF: {self.eval_vmaf}")
