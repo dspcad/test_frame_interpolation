@@ -423,7 +423,11 @@ class FrameInterpolationTest:
         original_video = self.report +"_original.avi"
         output_dir = self.report
 
+        #interpolate all odd frames in dataset dir
         self.interpolate_frame(self.dataset_dir, output_dir)
+   
+        
+        #VMAF evaluation
         self.create_video(os.path.join(self.root_dir, output_dir), frame_interpolation_video)
         self.create_video(self.dataset_dir, original_video)
 
@@ -436,6 +440,7 @@ class FrameInterpolationTest:
 
 
        
+        #PSNR/SSIM evaluation
         tot_psnr=[]
         tot_ssim=[]
         self.tot_hist=np.zeros(256);
