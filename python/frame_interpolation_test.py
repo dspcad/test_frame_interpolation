@@ -16,6 +16,8 @@ import xml.etree.ElementTree as ET
 
 import lpips
 import torch
+from PIL import Image
+
 
 SUPRESS_MSG = ''
 if platform.system() == 'Linux':
@@ -227,6 +229,16 @@ class FrameInterpolationTest:
                     )
                 )
 
+               
+ 
+                #################
+                #     blend     #
+                #################
+                #img_1 = Image.open(input1_name)
+                #img_2 = Image.open(input2_name)
+                #result = Image.blend(img_1, img_2, alpha=0.5)
+                #result.save(natsort_file_names[i])
+
     
     
                 #print(f"{os.path.join(self.root_dir,natsort_file_names[i])} {output_path}")
@@ -412,11 +424,10 @@ class FrameInterpolationTest:
 
                 tot_lpips.append(loss_fn.forward(ground_truth_img, interpolated_img).cpu().detach().numpy())
 
-        print(tot_lpips)
         self.eval_lpips = np.mean(tot_lpips)
         print(f"The average LPIPS: {self.eval_lpips}")
 
-
+    
 
 
     def psnr(self):
