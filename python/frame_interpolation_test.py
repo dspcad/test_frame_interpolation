@@ -14,6 +14,9 @@ np.random.seed(237)
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 
+import lpips
+import torch
+
 SUPRESS_MSG = ''
 if platform.system() == 'Linux':
     SUPRESS_MSG = '1>/dev/null'
@@ -62,9 +65,10 @@ class FrameInterpolationTest:
         self.tmp_interpolated_frame = "tmp_frame_interp_res.png"
 
         self.report = "test_res"
-        self.eval_psnr = 0
-        self.eval_ssim = 0
-        self.eval_vmaf = 0
+        self.eval_psnr  = 0
+        self.eval_ssim  = 0
+        self.eval_vmaf  = 0
+        self.eval_lpips = 0
 
 
 
@@ -375,7 +379,7 @@ class FrameInterpolationTest:
         self.create_video(self.dataset_dir, original_video)
 
         
-        os.system(f"ffmpeg -i {frame_interpolation_video} -i {original_video} -lavfi libvmaf=log_path=output.xml -f null -")
+        os.system(f"ffmpeg -hwaccel_device 0  -hwaccel cuda -i {frame_interpolation_video} -i {original_video} -lavfi libvmaf=log_path=output.xml -f null -")
         self.eval_vmaf = self.getAveVMAF("output.xml")
 
         shutil.move(frame_interpolation_video, f"{self.report}/")
@@ -383,6 +387,36 @@ class FrameInterpolationTest:
         shutil.move("output.xml", f"{self.report}/")
 
         print(f"The average VMAF: {self.eval_vmaf}")
+
+
+    def lpips(self):
+        ## Initializing the model
+        loss_fn = lpips.LPIPS(net='alex',version='0.1')
+        if torch.cuda.is_available():
+            loss_fn.cuda()
+
+        tot_lpips=[]
+        for i in tqdm(range(0,len(self.dataset_file_names)), position=0, leave=True):
+            if i%2==1 and i<len(self.dataset_file_names)-1:
+                ground_truth_path = os.path.join(self.dataset_dir, self.dataset_file_names[i])
+                interpolated_path = os.path.join(self.report, self.dataset_file_names[i])
+                #print(f"ground_truth_path: {ground_truth_path}");
+                #print(f"interpolated_path: {interpolated_path}");
+
+                interpolated_img = lpips.im2tensor(lpips.load_image(interpolated_path))
+                ground_truth_img = lpips.im2tensor(lpips.load_image(ground_truth_path))
+
+                if torch.cuda.is_available():
+                    interpolated_img = interpolated_img.cuda()
+                    ground_truth_img = ground_truth_img.cuda()
+
+                tot_lpips.append(loss_fn.forward(ground_truth_img, interpolated_img).cpu().detach().numpy())
+
+        print(tot_lpips)
+        self.eval_lpips = np.mean(tot_lpips)
+        print(f"The average LPIPS: {self.eval_lpips}")
+
+
 
 
     def psnr(self):
@@ -486,15 +520,16 @@ class FrameInterpolationTest:
         #interpolate all odd frames in dataset dir
         self.interpolate_frame(self.dataset_dir, output_dir)
    
-        
-        self.vmaf()
+        self.lpips()
+        #self.vmaf()
         #self.psnr()
         #self.ssim()
         #self.psnr_ssim()
         
        
 
-        return self.eval_vmaf
+        #return self.eval_vmaf
+        return self.eval_lpips
 
     def saveHist(self):
         plt.bar(list(np.arange(0, 256, 1, dtype=int)), self.tot_hist, color ='maroon',  width = 0.4)

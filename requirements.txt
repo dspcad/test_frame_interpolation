@@ -5,3 +5,4 @@ scikit-optimize
 scikit-image
 natsort
 tqdm
+lpips
